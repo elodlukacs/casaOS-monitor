@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CasaOS Monitor</string>
+    <string name="title_activity_main">CasaOS Monitor</string>
+    <string name="package_name">com.casaos.monitor</string>
+    <string name="custom_url_scheme">com.casaos.monitor</string>
+</resources>
