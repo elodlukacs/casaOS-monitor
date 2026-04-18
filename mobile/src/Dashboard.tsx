@@ -166,33 +166,37 @@ function FilledCard({ children, style }: { children: React.ReactNode; style?: Re
   );
 }
 
-function MiniStatCard({ label, value, unit, color, sub }: { label: string; value: string; unit?: string; color: string; sub?: string }) {
+// Top-row stat card: label + huge number + bar + sub, densely packed
+function MiniStatCard({ label, value, unit, color, sub, barPct }: {
+  label: string; value: string; unit?: string; color: string; sub?: string; barPct: number;
+}) {
   return (
     <FilledCard>
-      <div style={lblC}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, justifyContent: 'center' }}>
-        <span style={{ fontSize: '2.4rem', fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
-        {unit && <span style={{ fontSize: '0.9rem', fontWeight: 700, color, opacity: 0.8, marginBottom: 3 }}>{unit}</span>}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <span style={lblC}>{label}</span>
+        {sub && <span style={{ ...lblC, color: '#666' }}>{sub}</span>}
       </div>
-      <div style={lblC}>{sub ?? '\u00A0'}</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, marginTop: 2 }}>
+        <span style={{ fontSize: '2.3rem', fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
+        {unit && <span style={{ fontSize: '0.95rem', fontWeight: 700, color, opacity: 0.75, marginBottom: 2 }}>{unit}</span>}
+      </div>
+      <Bar value={barPct} color={color} thin />
     </FilledCard>
   );
 }
 
 function MemoryCardC({ metrics }: { metrics: Metrics }) {
   const pct = metrics.memory.usedPercent, color = heatColor(pct);
+  const used = (metrics.memory.used / 1_073_741_824).toFixed(1);
+  const total = (metrics.memory.total / 1_073_741_824).toFixed(1);
   return (
-    <FilledCard>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={lblC}>Memory</div>
-        <span style={{ fontSize: '1.5rem', fontWeight: 900, color, lineHeight: 1 }}>{Math.round(pct)}%</span>
-      </div>
-      <Bar value={pct} color={color} thin />
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <span style={lblC}>{(metrics.memory.used / 1_073_741_824).toFixed(1)} GB used</span>
-        <span style={lblC}>{(metrics.memory.total / 1_073_741_824).toFixed(1)} GB total</span>
-      </div>
-    </FilledCard>
+    <MiniStatCard
+      label="Memory"
+      value={`${Math.round(pct)}%`}
+      color={color}
+      sub={`${used}/${total} GB`}
+      barPct={pct}
+    />
   );
 }
 
@@ -202,19 +206,20 @@ function NetworkCardC({ metrics }: { metrics: Metrics }) {
   const rx = iface.rxBytesPerSec, tx = iface.txBytesPerSec, ref = 125_000_000;
   return (
     <FilledCard>
-      <div style={lblC}>Network · {iface.iface}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1, alignItems: 'center' }}>
-        <div>
-          <div style={lblC}>↓ Download</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#50f095', lineHeight: 1, marginTop: 3 }}>{fmtBytes(rx)}</div>
-          <Bar value={Math.min((rx / ref) * 100, 100)} color="#50f095" thin />
-        </div>
-        <div>
-          <div style={lblC}>↑ Upload</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#556cb1', lineHeight: 1, marginTop: 3 }}>{fmtBytes(tx)}</div>
-          <Bar value={Math.min((tx / ref) * 100, 100)} color="#556cb1" thin />
-        </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <span style={lblC}>Network</span>
+        <span style={{ ...lblC, color: '#666' }}>{iface.iface}</span>
       </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ fontSize: 13, color: '#50f095', fontWeight: 900 }}>↓</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#50f095', fontVariantNumeric: 'tabular-nums' }}>{fmtBytes(rx)}</span>
+      </div>
+      <Bar value={Math.min((rx / ref) * 100, 100)} color="#50f095" thin />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+        <span style={{ fontSize: 13, color: '#556cb1', fontWeight: 900 }}>↑</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#556cb1', fontVariantNumeric: 'tabular-nums' }}>{fmtBytes(tx)}</span>
+      </div>
+      <Bar value={Math.min((tx / ref) * 100, 100)} color="#556cb1" thin />
     </FilledCard>
   );
 }
@@ -343,37 +348,33 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
           </div>
         </div>
 
-        {/* 3-column grid — fills remaining height */}
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.15fr 1.15fr', gap: 7, padding: 7, minHeight: 0 }}>
+        {/* 4+2 grid: 4 stat cards on top, 2 wide cards below */}
+        <div style={{ flex: 1, display: 'grid', gridTemplateRows: '1fr 1.5fr', gap: 7, padding: 7, minHeight: 0 }}>
 
-          {/* Col 1: CPU + Temp (top half) | Memory (bottom half) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minHeight: 0 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, flex: 1, minHeight: 0 }}>
-              <MiniStatCard
-                label="CPU"
-                value={`${Math.round(cpuPct)}%`}
-                color={heatColor(cpuPct)}
-                sub={`Load ${(metrics.loadAvg?.one ?? 0).toFixed(2)}`}
-              />
-              <MiniStatCard
-                label="Temp"
-                value={temp !== null ? Math.round(temp).toString() : '—'}
-                unit={temp !== null ? '°C' : undefined}
-                color={temp !== null ? tempColor(temp) : '#444'}
-                sub={temp !== null ? 'junction' : 'n/a'}
-              />
-            </div>
+          {/* Row 1: CPU | Temp | Memory | Network */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 7, minHeight: 0 }}>
+            <MiniStatCard
+              label="CPU"
+              value={`${Math.round(cpuPct)}%`}
+              color={heatColor(cpuPct)}
+              sub={`Load ${(metrics.loadAvg?.one ?? 0).toFixed(2)}`}
+              barPct={cpuPct}
+            />
+            <MiniStatCard
+              label="Temp"
+              value={temp !== null ? Math.round(temp).toString() : '—'}
+              unit={temp !== null ? '°C' : undefined}
+              color={temp !== null ? tempColor(temp) : '#444'}
+              sub={temp !== null ? 'junction' : 'n/a'}
+              barPct={temp !== null ? Math.min((temp / 100) * 100, 100) : 0}
+            />
             <MemoryCardC metrics={metrics} />
-          </div>
-
-          {/* Col 2: Network (top half) | Storage (bottom half) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minHeight: 0 }}>
             <NetworkCardC metrics={metrics} />
-            <StorageCardC metrics={metrics} />
           </div>
 
-          {/* Col 3: Processes — full height */}
-          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          {/* Row 2: Storage | Processes */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, minHeight: 0 }}>
+            <StorageCardC metrics={metrics} />
             <ProcessesCardC metrics={metrics} />
           </div>
         </div>

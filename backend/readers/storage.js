@@ -18,6 +18,7 @@ function shortLabel(mountpoint) {
 
 function getStorageInfo() {
   const PROC_PATH = process.env.PROC_PATH || '/proc';
+  const HOST_ROOT = process.env.HOST_ROOT || ''; // e.g. /host/root inside Docker
   let content;
   try {
     content = fs.readFileSync(`${PROC_PATH}/mounts`, 'utf8');
@@ -31,7 +32,9 @@ function getStorageInfo() {
   for (const line of content.split('\n')) {
     const parts = line.trim().split(/\s+/);
     if (parts.length < 3) continue;
-    const [device, mountpoint, fstype] = parts;
+    // /proc/mounts uses octal escapes (e.g. \040 for space). Unescape mountpoint:
+    const [device, mountpointRaw, fstype] = parts;
+    const mountpoint = mountpointRaw.replace(/\\([0-7]{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8)));
 
     if (EXCLUDED_FS.has(fstype)) continue;
     if (mountpoint.startsWith('/snap/')) continue;
@@ -39,10 +42,18 @@ function getStorageInfo() {
     if (mountpoint.startsWith('/proc/')) continue;
     if (mountpoint.startsWith('/dev/')) continue;
     if (mountpoint.startsWith('/run/')) continue;
+    // Skip container's internal bind paths (just resolv.conf/etc. from host)
+    if (mountpoint.startsWith('/etc/')) continue;
     if (seen.has(device)) continue;
 
+    // Resolve path to statfs: in Docker we must statfs via HOST_ROOT prefix
+    // because the host mount target does not exist inside the container.
+    const statPath = HOST_ROOT
+      ? (mountpoint === '/' ? HOST_ROOT : HOST_ROOT + mountpoint)
+      : mountpoint;
+
     try {
-      const stat = fs.statfsSync(mountpoint);
+      const stat = fs.statfsSync(statPath);
       const total = stat.blocks * stat.bsize;
       const free  = stat.bavail * stat.bsize;
       const used  = total - (stat.bfree * stat.bsize);

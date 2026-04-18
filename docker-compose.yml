@@ -8,9 +8,11 @@ services:
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
     environment:
       - PROC_PATH=/host/proc
       - SYS_PATH=/host/sys
+      - HOST_ROOT=/host/root
       - PORT=3030
     pid: host
     restart: unless-stopped
