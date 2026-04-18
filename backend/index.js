@@ -9,6 +9,7 @@ const { getCpuUsage } = require('./readers/cpu');
 const { getMemoryInfo } = require('./readers/memory');
 const { getNetworkInfo } = require('./readers/network');
 const { getDiskInfo } = require('./readers/disk');
+const { getStorageInfo } = require('./readers/storage');
 const { getProcesses } = require('./readers/processes');
 const { getTemperatures } = require('./readers/temperature');
 
@@ -72,6 +73,7 @@ function collectMetrics() {
       memory: getMemoryInfo(),
       network: getNetworkInfo(),
       disk: getDiskInfo(),
+      storage: getStorageInfo(),
       temperature: getTemperatures(),
       processes: getProcesses(),
       cpuModel: getCpuModel(),

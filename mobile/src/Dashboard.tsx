@@ -19,12 +19,6 @@ function fmtBytes(b: number): string {
   return `${b} B/s`;
 }
 
-function fmtDisk(b: number): string {
-  if (b >= 1_073_741_824) return `${(b / 1_073_741_824).toFixed(1)} GB/s`;
-  if (b >= 1_048_576)     return `${(b / 1_048_576).toFixed(1)} MB/s`;
-  if (b >= 1_024)         return `${(b / 1_024).toFixed(0)} KB/s`;
-  return `${b} B/s`;
-}
 
 function heatColor(pct: number): string {
   if (pct >= 80) return '#fa1e1e';
@@ -117,36 +111,47 @@ function NetworkCard({ metrics }: { metrics: Metrics }) {
   );
 }
 
-function DiskCard({ metrics }: { metrics: Metrics }) {
-  const disk = metrics.disk[0];
-  if (!disk) return null;
+function fmtSize(b: number): string {
+  if (b >= 1_099_511_627_776) return `${(b / 1_099_511_627_776).toFixed(1)} TB`;
+  if (b >= 1_073_741_824)     return `${(b / 1_073_741_824).toFixed(1)} GB`;
+  if (b >= 1_048_576)         return `${(b / 1_048_576).toFixed(0)} MB`;
+  return `${b} B`;
+}
 
-  const read  = disk.readBytesPerSec;
-  const write = disk.writeBytesPerSec;
-  const maxDisk = 600_000_000; // 600 MB/s reference
-  const rPct = Math.min((read  / maxDisk) * 100, 100);
-  const wPct = Math.min((write / maxDisk) * 100, 100);
+function StorageCard({ metrics }: { metrics: Metrics }) {
+  const drives = (metrics.storage ?? []).filter(s => s.total > 100 * 1024 * 1024 * 1024);
+  if (drives.length === 0) return null;
 
   return (
     <div className="rounded-2xl p-5" style={{ background: '#1a1a1a', border: '1px solid #2a2a2a' }}>
       <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#555' }}>
-        Disk · {disk.device}
+        Storage
       </span>
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        <div>
-          <div className="text-xs font-medium mb-1" style={{ color: '#555' }}>Read</div>
-          <div className="font-black" style={{ fontSize: '1.6rem', color: '#f2e266', lineHeight: 1 }}>
-            {fmtDisk(read)}
-          </div>
-          <Bar value={rPct} color="#f2e266" />
-        </div>
-        <div>
-          <div className="text-xs font-medium mb-1" style={{ color: '#555' }}>Write</div>
-          <div className="font-black" style={{ fontSize: '1.6rem', color: '#ee79d3', lineHeight: 1 }}>
-            {fmtDisk(write)}
-          </div>
-          <Bar value={wPct} color="#ee79d3" />
-        </div>
+      <div className="mt-4 flex flex-col gap-4">
+        {drives.map(drive => {
+          const color = heatColor(drive.usedPercent);
+          return (
+            <div key={drive.mountpoint}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-semibold" style={{ color: '#ccc' }}>
+                  {drive.label}
+                </span>
+                <span className="font-black text-sm" style={{ color }}>
+                  {Math.round(drive.usedPercent)}%
+                </span>
+              </div>
+              <Bar value={drive.usedPercent} color={color} />
+              <div className="flex justify-between mt-1">
+                <span className="text-xs" style={{ color: '#444' }}>
+                  {fmtSize(drive.used)} used
+                </span>
+                <span className="text-xs" style={{ color: '#444' }}>
+                  {fmtSize(drive.total)} total
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -216,7 +221,7 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
   return (
     <div
       className="flex flex-col safe-top safe-bottom"
-      style={{ minHeight: '100vh', background: '#111', overflowY: 'auto', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+      style={{ minHeight: '100vh', background: '#111' }}
     >
       {/* Header */}
       <div
@@ -301,8 +306,8 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
           </div>
         </div>
 
-        {/* Disk */}
-        <DiskCard metrics={metrics} />
+        {/* Storage */}
+        <StorageCard metrics={metrics} />
 
         {/* Network */}
         <NetworkCard metrics={metrics} />

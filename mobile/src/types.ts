@@ -25,6 +25,15 @@ export interface DiskInfo {
   writeBytesPerSec: number;
 }
 
+export interface StorageInfo {
+  mountpoint: string;
+  label: string;
+  total: number;
+  used: number;
+  free: number;
+  usedPercent: number;
+}
+
 export interface TemperatureInfo {
   cpu: number;
   all: { label: string; celsius: number }[];
@@ -54,6 +63,7 @@ export interface Metrics {
   memory: MemoryInfo;
   network: NetworkInterface[];
   disk: DiskInfo[];
+  storage: StorageInfo[];
   temperature: TemperatureInfo | null;
   processes: Process[];
 }
