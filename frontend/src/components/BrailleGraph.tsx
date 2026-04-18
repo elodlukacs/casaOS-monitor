@@ -3,60 +3,44 @@ import { useEffect, useRef, useState } from 'react';
 interface BrailleGraphProps {
   data: number[];
   max?: number;
-  height?: number; // in braille chars (each char = 4 rows), default 8
+  height?: number;
+  // Single color OR vertical gradient stops [bottom, middle, top]
   color: string;
+  gradient?: [string, string, string];
 }
 
-// Braille bit layout (Unicode standard):
-// Each braille char covers a 2-col x 4-row cell
-// left col:  row0=bit0, row1=bit1, row2=bit2, row3=bit6
-// right col: row0=bit3, row1=bit4, row2=bit5, row3=bit7
 const LEFT_BITS = [0x01, 0x02, 0x04, 0x40];
 const RIGHT_BITS = [0x08, 0x10, 0x20, 0x80];
 
-function buildBrailleGrid(
+// One braille char per row, one mask per column (column-major flat grid)
+function buildBrailleRows(
   data: number[],
   maxVal: number,
   cols: number,
-  rows: number, // in braille chars (4 pixel rows each)
-): string {
+  rows: number,
+): string[] {
   const pixelRows = rows * 4;
-  // Each braille char is 2 pixels wide
   const pixelCols = cols * 2;
 
-  // Resample data to pixelCols buckets
   const buckets: number[] = new Array(pixelCols).fill(0);
   if (data.length > 0) {
     for (let px = 0; px < pixelCols; px++) {
-      let dataIdx: number;
-      if (data.length >= pixelCols) {
-        // enough data: scroll — latest point on the right
-        dataIdx = data.length - pixelCols + px;
-      } else {
-        // not enough data yet: stretch to fill full width
-        dataIdx = Math.floor((px / pixelCols) * data.length);
-      }
-      if (dataIdx >= 0 && dataIdx < data.length) {
-        buckets[px] = data[dataIdx];
-      }
+      const dataIdx = data.length >= pixelCols
+        ? data.length - pixelCols + px
+        : Math.floor((px / pixelCols) * data.length);
+      if (dataIdx >= 0 && dataIdx < data.length) buckets[px] = data[dataIdx];
     }
   }
 
-  // Build pixel grid [pixelRow][pixelCol] = filled?
   const grid: boolean[][] = Array.from({ length: pixelRows }, () =>
     new Array(pixelCols).fill(false),
   );
-
   for (let px = 0; px < pixelCols; px++) {
     const val = Math.min(maxVal, Math.max(0, buckets[px]));
     const fillHeight = Math.round((val / maxVal) * pixelRows);
-    // Fill from bottom up
-    for (let pr = pixelRows - fillHeight; pr < pixelRows; pr++) {
-      grid[pr][px] = true;
-    }
+    for (let pr = pixelRows - fillHeight; pr < pixelRows; pr++) grid[pr][px] = true;
   }
 
-  // Convert pixel grid to braille characters
   const lines: string[] = [];
   for (let row = 0; row < rows; row++) {
     let line = '';
@@ -71,47 +55,55 @@ function buildBrailleGrid(
     }
     lines.push(line);
   }
-
-  return lines.join('\n');
+  return lines;
 }
 
-export default function BrailleGraph({ data, max, height = 8, color }: BrailleGraphProps) {
+export default function BrailleGraph({ data, max, height = 8, color, gradient }: BrailleGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cols, setCols] = useState(40);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
     function measure() {
       if (!el) return;
-      // Measure char width using canvas
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.font = "12px 'JetBrains Mono', monospace";
       const charWidth = ctx.measureText('⣿').width;
       if (charWidth > 0) {
-        const containerWidth = el.getBoundingClientRect().width;
-        // ceil+1 so graph fills edge; overflow:hidden clips any excess
-        setCols(Math.max(4, Math.ceil(containerWidth / charWidth) + 1));
+        const w = el.getBoundingClientRect().width;
+        setCols(Math.max(4, Math.ceil(w / charWidth) + 1));
       }
     }
-
-    // Observe the PARENT element — observing el itself creates a feedback loop
-    // because the <pre> inside it can expand el's width.
     const target = el.parentElement ?? el;
     const ro = new ResizeObserver(measure);
     ro.observe(target);
-
-    // Initial measure after webfont loads so charWidth is accurate
     document.fonts.ready.then(measure);
-
     return () => ro.disconnect();
   }, []);
 
   const maxVal = max ?? Math.max(...data, 1);
-  const text = buildBrailleGrid(data, maxVal, cols, height);
+  const rows = buildBrailleRows(data, maxVal, cols, height);
+
+  // Render: each row gets its own color from vertical gradient so a tall
+  // spike takes on multiple colors (green→yellow→red) like btop.
+  const rowColor = (rowIdx: number) => {
+    if (!gradient) return color;
+    // rowIdx 0 is top; we want bottom=gradient[0], top=gradient[2]
+    const t = height === 1 ? 0 : 1 - rowIdx / (height - 1);
+    const [a, b, c] = gradient;
+    const hex = (s: string) => [
+      parseInt(s.slice(1, 3), 16),
+      parseInt(s.slice(3, 5), 16),
+      parseInt(s.slice(5, 7), 16),
+    ];
+    const lerp = (x: number[], y: number[], k: number) =>
+      x.map((v, i) => Math.round(v + (y[i] - v) * k));
+    const rgb = t < 0.5 ? lerp(hex(a), hex(b), t * 2) : lerp(hex(b), hex(c), (t - 0.5) * 2);
+    return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+  };
 
   return (
     <div ref={containerRef} style={{ width: '100%', overflow: 'hidden' }}>
@@ -122,13 +114,16 @@ export default function BrailleGraph({ data, max, height = 8, color }: BrailleGr
           fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
           fontSize: 12,
           lineHeight: 1.1,
-          color,
           whiteSpace: 'pre',
           overflow: 'hidden',
           userSelect: 'none',
         }}
       >
-        {text}
+        {rows.map((line, i) => (
+          <div key={i} style={{ color: rowColor(i), lineHeight: 1.1 }}>
+            {line}
+          </div>
+        ))}
       </pre>
     </div>
   );

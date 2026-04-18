@@ -3,10 +3,10 @@ import type { Metrics } from './types';
 import CpuPanel from './components/CpuPanel';
 import MemoryPanel from './components/MemoryPanel';
 import NetworkPanel from './components/NetworkPanel';
-import DiskPanel from './components/DiskPanel';
 import ProcessList from './components/ProcessList';
+import { theme } from './theme';
 
-const HISTORY = 60;
+const HISTORY = 120;
 const WS_URL = import.meta.env.DEV ? 'ws://localhost:3030' : `ws://${window.location.host}`;
 const INTERVALS = [100, 200, 500, 1000];
 
@@ -28,7 +28,6 @@ export default function App() {
   const [now, setNow] = useState(() => new Date());
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Clock tick every second
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
@@ -44,7 +43,6 @@ export default function App() {
     function connect() {
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
-
       ws.onopen = () => {
         setConnected(true);
         setIntervalMs(prev => {
@@ -57,14 +55,11 @@ export default function App() {
         setTimeout(connect, 2000);
       };
       ws.onerror = () => ws.close();
-
       ws.onmessage = (e) => {
         const data: Metrics = JSON.parse(e.data);
         setMetrics(data);
-
         const total = data.cpu.find(c => c.name === 'cpu');
         if (total) setCpuHistory(h => [...h.slice(-(HISTORY - 1)), total.usage]);
-
         const iface = data.network[0];
         if (iface) {
           setRxHistory(h => [...h.slice(-(HISTORY - 1)), iface.rxBytesPerSec]);
@@ -72,7 +67,6 @@ export default function App() {
         }
       };
     }
-
     connect();
     return () => wsRef.current?.close();
   }, []);
@@ -107,10 +101,10 @@ export default function App() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#1a1a1a',
+          backgroundColor: theme.bg,
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 12,
-          color: '#555',
+          color: theme.graph_text,
           letterSpacing: '0.1em',
         }}
       >
@@ -123,14 +117,14 @@ export default function App() {
     <div
       style={{
         minHeight: '100vh',
-        backgroundColor: '#1a1a1a',
-        color: '#cccccc',
+        backgroundColor: theme.bg,
+        color: theme.fg,
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11,
         padding: 12,
       }}
     >
-      {/* btop-style header */}
+      {/* Top strip: btop++ [hostname]  ...  clock  ...  interval/status */}
       <div
         style={{
           display: 'flex',
@@ -138,25 +132,27 @@ export default function App() {
           justifyContent: 'space-between',
           marginBottom: 10,
           padding: '0 2px',
+          fontSize: 11,
+          letterSpacing: '0.08em',
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: 11, letterSpacing: '0.15em' }}>
-          <span style={{ color: '#ee79d3' }}>btop  </span>
-          <span style={{ color: '#556cb1' }}>{metrics.hostname}</span>
+        <div>
+          <span style={{ color: theme.proc_misc, fontWeight: 700 }}>btop++ </span>
+          <span style={{ color: theme.hi_fg }}>on </span>
+          <span style={{ color: theme.title, fontWeight: 700 }}>{metrics.hostname}</span>
         </div>
-        <div style={{ fontSize: 10, color: '#888' }}>
-          {fmtTime(now)}
-          {'   '}
-          <span style={{ color: '#404040' }}>interval: </span>
-          <span style={{ color: '#ee79d3' }}>{fmtInterval(intervalMs)}</span>
-          <span style={{ color: '#404040' }}> (+/-)</span>
+        <div style={{ color: theme.graph_text }}>
+          <span style={{ color: theme.fg }}>{fmtTime(now)}</span>
+          <span>    update: </span>
+          <span style={{ color: theme.proc_misc }}>{fmtInterval(intervalMs)}</span>
+          <span style={{ color: theme.inactive_fg }}> (+/-)</span>
         </div>
-        <div style={{ fontSize: 10, color: connected ? '#50f095' : '#fa1e1e' }}>
+        <div style={{ color: connected ? theme.cpu_start : theme.cpu_end }}>
           {connected ? '● live' : '○ offline'}
         </div>
       </div>
 
-      {/* Row 1: CPU full width */}
+      {/* btop default preset: CPU full-width top; then Mem | Net | Proc */}
       <div style={{ marginBottom: 10 }}>
         <CpuPanel
           cores={metrics.cpu}
@@ -168,16 +164,16 @@ export default function App() {
         />
       </div>
 
-      {/* Row 2: left 35% (mem + net stacked) | right 65% (proc) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '35% 1fr', gap: 10, alignItems: 'start' }}>
-        {/* Left column: mem + net */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <MemoryPanel memory={metrics.memory} />
-          <NetworkPanel network={metrics.network} rxHistory={rxHistory} txHistory={txHistory} />
-          <DiskPanel disk={metrics.disk} />
-        </div>
-
-        {/* Right column: proc */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(280px, 24%) minmax(280px, 24%) 1fr',
+          gap: 10,
+          alignItems: 'stretch',
+        }}
+      >
+        <MemoryPanel memory={metrics.memory} disk={metrics.disk} storage={metrics.storage ?? []} />
+        <NetworkPanel network={metrics.network} rxHistory={rxHistory} txHistory={txHistory} />
         <ProcessList processes={metrics.processes} totalMem={metrics.memory.total} />
       </div>
     </div>
