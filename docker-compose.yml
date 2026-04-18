@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  casaos-monitor:
+    build: .
+    container_name: casaos-monitor
+    network_mode: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    environment:
+      - PROC_PATH=/host/proc
+      - SYS_PATH=/host/sys
+      - PORT=3030
+    pid: host
+    restart: unless-stopped
