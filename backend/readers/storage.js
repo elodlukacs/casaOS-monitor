@@ -37,20 +37,28 @@ function getStorageInfo() {
     const mountpoint = mountpointRaw.replace(/\\([0-7]{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8)));
 
     if (EXCLUDED_FS.has(fstype)) continue;
-    if (mountpoint.startsWith('/snap/')) continue;
-    if (mountpoint.startsWith('/sys/')) continue;
-    if (mountpoint.startsWith('/proc/')) continue;
-    if (mountpoint.startsWith('/dev/')) continue;
-    if (mountpoint.startsWith('/run/')) continue;
-    // Skip container's internal bind paths (just resolv.conf/etc. from host)
-    if (mountpoint.startsWith('/etc/')) continue;
-    if (seen.has(device)) continue;
 
-    // Resolve path to statfs: in Docker we must statfs via HOST_ROOT prefix
-    // because the host mount target does not exist inside the container.
-    const statPath = HOST_ROOT
-      ? (mountpoint === '/' ? HOST_ROOT : HOST_ROOT + mountpoint)
-      : mountpoint;
+    // In Docker, host mounts are rslave-propagated under HOST_ROOT (e.g. /host/root).
+    // Only consider mounts that live there so we don't count the container's own FS.
+    // Outside Docker (HOST_ROOT empty), use the mountpoint as-is.
+    let hostPath; // logical path on the host, used for filtering + display
+    let statPath; // path we actually pass to statfs (must resolve in container)
+    if (HOST_ROOT) {
+      if (!mountpoint.startsWith(HOST_ROOT)) continue;
+      hostPath = mountpoint === HOST_ROOT ? '/' : mountpoint.substring(HOST_ROOT.length);
+      statPath = mountpoint;
+    } else {
+      hostPath = mountpoint;
+      statPath = mountpoint;
+    }
+
+    if (hostPath.startsWith('/snap/')) continue;
+    if (hostPath.startsWith('/sys/')) continue;
+    if (hostPath.startsWith('/proc/')) continue;
+    if (hostPath.startsWith('/dev/')) continue;
+    if (hostPath.startsWith('/run/')) continue;
+    if (hostPath.startsWith('/etc/')) continue;
+    if (seen.has(device)) continue;
 
     try {
       const stat = fs.statfsSync(statPath);
@@ -64,8 +72,8 @@ function getStorageInfo() {
 
       seen.add(device);
       results.push({
-        mountpoint,
-        label: shortLabel(mountpoint),
+        mountpoint: hostPath,
+        label: shortLabel(hostPath),
         total,
         used,
         free,
