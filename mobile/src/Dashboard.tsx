@@ -31,28 +31,25 @@ function fmtSize(b: number) {
   return `${b} B`;
 }
 
-// ── shared primitives ─────────────────────────────────────────────────────────
+// ── primitives ────────────────────────────────────────────────────────────────
+
+const card: React.CSSProperties  = { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 16, padding: 20 };
+const cardC: React.CSSProperties = { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 12, padding: '10px 12px' };
+const lbl:  React.CSSProperties  = { fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555' } as React.CSSProperties;
+const lblC: React.CSSProperties  = { fontSize: 9,  fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555' } as React.CSSProperties;
 
 function Bar({ value, color, thin }: { value: number; color: string; thin?: boolean }) {
   const h = thin ? 3 : 6;
   return (
-    <div style={{ width: '100%', height: h, borderRadius: h, background: '#2a2a2a', marginTop: thin ? 4 : 6 }}>
-      <div style={{
-        height: h, borderRadius: h,
-        width: `${Math.min(value, 100)}%`,
-        background: color,
-        transition: 'width 0.5s ease',
-      }} />
+    <div style={{ width: '100%', height: h, borderRadius: h, background: '#2a2a2a', marginTop: thin ? 3 : 5, flexShrink: 0 }}>
+      <div style={{ height: h, borderRadius: h, width: `${Math.min(value, 100)}%`, background: color, transition: 'width 0.5s ease' }} />
     </div>
   );
 }
 
-// ── card variants ─────────────────────────────────────────────────────────────
+// ── portrait cards ────────────────────────────────────────────────────────────
 
-// Big single-metric card (CPU, Temp) — portrait
-function BigCard({ label, value, unit, color, sub }: {
-  label: string; value: string; unit?: string; color: string; sub?: string;
-}) {
+function BigCard({ label, value, unit, color, sub }: { label: string; value: string; unit?: string; color: string; sub?: string }) {
   return (
     <div style={card}>
       <div style={lbl}>{label}</div>
@@ -65,26 +62,8 @@ function BigCard({ label, value, unit, color, sub }: {
   );
 }
 
-// Compact single-metric card — landscape
-function MiniCard({ label, value, unit, color, sub }: {
-  label: string; value: string; unit?: string; color: string; sub?: string;
-}) {
-  return (
-    <div style={cardC}>
-      <div style={lblC}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, marginTop: 4 }}>
-        <span style={{ fontSize: '2.1rem', fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
-        {unit && <span style={{ fontSize: '0.9rem', fontWeight: 700, color, opacity: 0.75, marginBottom: 2 }}>{unit}</span>}
-      </div>
-      {sub && <div style={{ ...lblC, marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
-}
-
-// Memory — portrait
 function MemoryCard({ metrics }: { metrics: Metrics }) {
-  const pct = metrics.memory.usedPercent;
-  const color = heatColor(pct);
+  const pct = metrics.memory.usedPercent, color = heatColor(pct);
   return (
     <div style={card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
@@ -100,31 +79,10 @@ function MemoryCard({ metrics }: { metrics: Metrics }) {
   );
 }
 
-// Memory — landscape compact
-function MemoryCardC({ metrics }: { metrics: Metrics }) {
-  const pct = metrics.memory.usedPercent;
-  const color = heatColor(pct);
-  return (
-    <div style={cardC}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={lblC}>Memory</div>
-        <span style={{ fontSize: '1.6rem', fontWeight: 900, color, lineHeight: 1 }}>{Math.round(pct)}%</span>
-      </div>
-      <Bar value={pct} color={color} thin />
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-        <span style={lblC}>{(metrics.memory.used / 1_073_741_824).toFixed(1)} GB</span>
-        <span style={lblC}>{(metrics.memory.total / 1_073_741_824).toFixed(1)} GB total</span>
-      </div>
-    </div>
-  );
-}
-
-// Network — portrait
 function NetworkCard({ metrics }: { metrics: Metrics }) {
   const iface = metrics.network[0];
   if (!iface) return null;
-  const rx = iface.rxBytesPerSec, tx = iface.txBytesPerSec;
-  const ref = 125_000_000;
+  const rx = iface.rxBytesPerSec, tx = iface.txBytesPerSec, ref = 125_000_000;
   return (
     <div style={card}>
       <div style={lbl}>Network · {iface.iface}</div>
@@ -144,34 +102,8 @@ function NetworkCard({ metrics }: { metrics: Metrics }) {
   );
 }
 
-// Network — landscape compact
-function NetworkCardC({ metrics }: { metrics: Metrics }) {
-  const iface = metrics.network[0];
-  if (!iface) return null;
-  const rx = iface.rxBytesPerSec, tx = iface.txBytesPerSec;
-  const ref = 125_000_000;
-  return (
-    <div style={cardC}>
-      <div style={lblC}>Network · {iface.iface}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
-        <div>
-          <div style={lblC}>↓</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#50f095', lineHeight: 1, marginTop: 2 }}>{fmtBytes(rx)}</div>
-          <Bar value={Math.min((rx / ref) * 100, 100)} color="#50f095" thin />
-        </div>
-        <div>
-          <div style={lblC}>↑</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#556cb1', lineHeight: 1, marginTop: 2 }}>{fmtBytes(tx)}</div>
-          <Bar value={Math.min((tx / ref) * 100, 100)} color="#556cb1" thin />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Storage — portrait
 function StorageCard({ metrics }: { metrics: Metrics }) {
-  const drives = (metrics.storage ?? []).filter(s => s.total > 100 * 1024 * 1024 * 1024);
+  const drives = (metrics.storage ?? []).filter(s => s.total > 1024 * 1024 * 1024);
   if (!drives.length) return null;
   return (
     <div style={card}>
@@ -198,32 +130,6 @@ function StorageCard({ metrics }: { metrics: Metrics }) {
   );
 }
 
-// Storage — landscape compact
-function StorageCardC({ metrics }: { metrics: Metrics }) {
-  const drives = (metrics.storage ?? []).filter(s => s.total > 100 * 1024 * 1024 * 1024);
-  if (!drives.length) return null;
-  return (
-    <div style={cardC}>
-      <div style={lblC}>Storage</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
-        {drives.map(d => {
-          const color = heatColor(d.usedPercent);
-          return (
-            <div key={d.mountpoint}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#ccc' }}>{d.label}</span>
-                <span style={{ fontSize: 11, fontWeight: 900, color }}>{Math.round(d.usedPercent)}% · {fmtSize(d.used)}/{fmtSize(d.total)}</span>
-              </div>
-              <Bar value={d.usedPercent} color={color} thin />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Processes — portrait
 function ProcessesCard({ metrics }: { metrics: Metrics }) {
   const top3 = [...metrics.processes].sort((a, b) => b.cpuPercent - a.cpuPercent).slice(0, 3);
   const medals = ['🥇', '🥈', '🥉'];
@@ -249,14 +155,108 @@ function ProcessesCard({ metrics }: { metrics: Metrics }) {
   );
 }
 
-// Processes — landscape compact
+// ── landscape compact cards (fill their flex container height) ────────────────
+
+// Generic filled card wrapper
+function FilledCard({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{ ...cardC, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function MiniStatCard({ label, value, unit, color, sub }: { label: string; value: string; unit?: string; color: string; sub?: string }) {
+  return (
+    <FilledCard>
+      <div style={lblC}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, justifyContent: 'center' }}>
+        <span style={{ fontSize: '2.4rem', fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
+        {unit && <span style={{ fontSize: '0.9rem', fontWeight: 700, color, opacity: 0.8, marginBottom: 3 }}>{unit}</span>}
+      </div>
+      <div style={lblC}>{sub ?? '\u00A0'}</div>
+    </FilledCard>
+  );
+}
+
+function MemoryCardC({ metrics }: { metrics: Metrics }) {
+  const pct = metrics.memory.usedPercent, color = heatColor(pct);
+  return (
+    <FilledCard>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={lblC}>Memory</div>
+        <span style={{ fontSize: '1.5rem', fontWeight: 900, color, lineHeight: 1 }}>{Math.round(pct)}%</span>
+      </div>
+      <Bar value={pct} color={color} thin />
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <span style={lblC}>{(metrics.memory.used / 1_073_741_824).toFixed(1)} GB used</span>
+        <span style={lblC}>{(metrics.memory.total / 1_073_741_824).toFixed(1)} GB total</span>
+      </div>
+    </FilledCard>
+  );
+}
+
+function NetworkCardC({ metrics }: { metrics: Metrics }) {
+  const iface = metrics.network[0];
+  if (!iface) return null;
+  const rx = iface.rxBytesPerSec, tx = iface.txBytesPerSec, ref = 125_000_000;
+  return (
+    <FilledCard>
+      <div style={lblC}>Network · {iface.iface}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1, alignItems: 'center' }}>
+        <div>
+          <div style={lblC}>↓ Download</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#50f095', lineHeight: 1, marginTop: 3 }}>{fmtBytes(rx)}</div>
+          <Bar value={Math.min((rx / ref) * 100, 100)} color="#50f095" thin />
+        </div>
+        <div>
+          <div style={lblC}>↑ Upload</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#556cb1', lineHeight: 1, marginTop: 3 }}>{fmtBytes(tx)}</div>
+          <Bar value={Math.min((tx / ref) * 100, 100)} color="#556cb1" thin />
+        </div>
+      </div>
+    </FilledCard>
+  );
+}
+
+function StorageCardC({ metrics }: { metrics: Metrics }) {
+  const drives = (metrics.storage ?? []).filter(s => s.total > 1024 * 1024 * 1024);
+  return (
+    <FilledCard>
+      <div style={lblC}>Storage</div>
+      {drives.length === 0 ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: 10, color: '#333' }}>restart backend to load</span>
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around' }}>
+          {drives.map(d => {
+            const color = heatColor(d.usedPercent);
+            return (
+              <div key={d.mountpoint}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#ccc' }}>{d.label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 900, color }}>
+                    {Math.round(d.usedPercent)}% · {fmtSize(d.used)}/{fmtSize(d.total)}
+                  </span>
+                </div>
+                <Bar value={d.usedPercent} color={color} thin />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </FilledCard>
+  );
+}
+
 function ProcessesCardC({ metrics }: { metrics: Metrics }) {
   const top3 = [...metrics.processes].sort((a, b) => b.cpuPercent - a.cpuPercent).slice(0, 3);
   const medals = ['🥇', '🥈', '🥉'];
   return (
-    <div style={{ ...cardC, flex: 1 }}>
+    <FilledCard style={{ flex: 1 }}>
       <div style={lblC}>Top Processes</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 6, flex: 1, justifyContent: 'space-around' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around' }}>
         {top3.map((p, i) => {
           const color = heatColor(p.cpuPercent);
           return (
@@ -271,30 +271,11 @@ function ProcessesCardC({ metrics }: { metrics: Metrics }) {
           );
         })}
       </div>
-    </div>
+    </FilledCard>
   );
 }
 
-// ── style tokens ──────────────────────────────────────────────────────────────
-
-const card: React.CSSProperties = {
-  background: '#1a1a1a', border: '1px solid #2a2a2a',
-  borderRadius: 16, padding: 20,
-};
-const cardC: React.CSSProperties = {
-  background: '#1a1a1a', border: '1px solid #2a2a2a',
-  borderRadius: 12, padding: 12,
-};
-const lbl: React.CSSProperties = {
-  fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
-  textTransform: 'uppercase', color: '#555',
-};
-const lblC: React.CSSProperties = {
-  fontSize: 9, fontWeight: 600, letterSpacing: '0.08em',
-  textTransform: 'uppercase', color: '#555',
-};
-
-// ── orientation hook ──────────────────────────────────────────────────────────
+// ── hooks ─────────────────────────────────────────────────────────────────────
 
 function useIsLandscape() {
   const [ls, setLs] = useState(() => window.innerWidth > window.innerHeight);
@@ -307,23 +288,17 @@ function useIsLandscape() {
   return ls;
 }
 
-// ── wake lock ─────────────────────────────────────────────────────────────────
-
 function useWakeLock() {
   const lockRef = useRef<WakeLockSentinel | null>(null);
   useEffect(() => {
+    type Nav = Navigator & { wakeLock?: { request(t: string): Promise<WakeLockSentinel> } };
     async function acquire() {
-      try {
-        lockRef.current = await (navigator as Navigator & { wakeLock?: { request: (t: string) => Promise<WakeLockSentinel> } }).wakeLock?.request('screen') ?? null;
-      } catch {}
+      try { lockRef.current = await (navigator as Nav).wakeLock?.request('screen') ?? null; } catch {}
     }
     acquire();
     const onVisible = () => { if (document.visibilityState === 'visible') acquire(); };
     document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      lockRef.current?.release();
-      document.removeEventListener('visibilitychange', onVisible);
-    };
+    return () => { lockRef.current?.release(); document.removeEventListener('visibilitychange', onVisible); };
   }, []);
 }
 
@@ -346,35 +321,41 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
 
   if (landscape) {
     return (
-      <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#111', overflow: 'hidden', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
+      <div style={{
+        height: '100dvh', display: 'flex', flexDirection: 'column',
+        background: '#111', overflow: 'hidden',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}>
         {/* Compact header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', borderBottom: '1px solid #1e1e1e', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 12px', borderBottom: '1px solid #1e1e1e', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontWeight: 900, fontSize: 13, color: '#ee79d3' }}>CasaOS</span>
             <span style={{ fontSize: 10, color: '#444' }}>{metrics.hostname}</span>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#50f095', boxShadow: '0 0 5px #50f095' }} />
             <span style={{ fontSize: 10, color: '#50f095' }}>live</span>
-            <span style={{ fontSize: 10, color: '#333' }}>· {metrics.uptime}</span>
+            <span style={{ fontSize: 10, color: '#2a2a2a' }}>·</span>
+            <span style={{ fontSize: 10, color: '#333' }}>{metrics.uptime}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#555', fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
-            <button onClick={onDisconnect} style={{ background: '#2a2a2a', color: '#888', border: 'none', borderRadius: 8, padding: '3px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>✕</button>
+            <button onClick={onDisconnect} style={{ background: '#222', color: '#666', border: '1px solid #333', borderRadius: 7, padding: '2px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>✕</button>
           </div>
         </div>
 
-        {/* 3-column grid */}
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.1fr 1.1fr', gap: 8, padding: 8, minHeight: 0 }}>
+        {/* 3-column grid — fills remaining height */}
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1.15fr 1.15fr', gap: 7, padding: 7, minHeight: 0 }}>
 
-          {/* Col 1: CPU + Temp | Memory */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1 }}>
-              <MiniCard
+          {/* Col 1: CPU + Temp (top half) | Memory (bottom half) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minHeight: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, flex: 1, minHeight: 0 }}>
+              <MiniStatCard
                 label="CPU"
                 value={`${Math.round(cpuPct)}%`}
                 color={heatColor(cpuPct)}
                 sub={`Load ${(metrics.loadAvg?.one ?? 0).toFixed(2)}`}
               />
-              <MiniCard
+              <MiniStatCard
                 label="Temp"
                 value={temp !== null ? Math.round(temp).toString() : '—'}
                 unit={temp !== null ? '°C' : undefined}
@@ -385,13 +366,13 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
             <MemoryCardC metrics={metrics} />
           </div>
 
-          {/* Col 2: Network | Storage */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0 }}>
+          {/* Col 2: Network (top half) | Storage (bottom half) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minHeight: 0 }}>
             <NetworkCardC metrics={metrics} />
             <StorageCardC metrics={metrics} />
           </div>
 
-          {/* Col 3: Top Processes — full height */}
+          {/* Col 3: Processes — full height */}
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <ProcessesCardC metrics={metrics} />
           </div>
@@ -404,7 +385,6 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#111' }} className="safe-top safe-bottom">
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid #1e1e1e' }}>
         <div>
           <div style={{ fontWeight: 900, fontSize: 15, color: '#ee79d3' }}>CasaOS</div>
@@ -416,14 +396,12 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
         </div>
       </div>
 
-      {/* Live dot */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px 4px' }}>
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#50f095', boxShadow: '0 0 6px #50f095' }} />
         <span style={{ fontSize: 11, fontWeight: 600, color: '#50f095' }}>Live</span>
         <span style={{ fontSize: 11, color: '#333' }}>· uptime {metrics.uptime}</span>
       </div>
 
-      {/* Cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '10px 16px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <BigCard label="CPU" value={`${Math.round(cpuPct)}%`} color={heatColor(cpuPct)} sub={`Load ${(metrics.loadAvg?.one ?? 0).toFixed(2)}`} />
