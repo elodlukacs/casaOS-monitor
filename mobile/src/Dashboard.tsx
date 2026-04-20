@@ -36,7 +36,7 @@ function fmtSize(b: number) {
 const card: React.CSSProperties  = { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 16, padding: 20 };
 const cardC: React.CSSProperties = { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 12, padding: '10px 12px' };
 const lbl:  React.CSSProperties  = { fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555' } as React.CSSProperties;
-const lblC: React.CSSProperties  = { fontSize: 9,  fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555' } as React.CSSProperties;
+const lblC: React.CSSProperties  = { fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555' } as React.CSSProperties;
 
 function Bar({ value, color, thin }: { value: number; color: string; thin?: boolean }) {
   const h = thin ? 3 : 6;
@@ -177,8 +177,8 @@ function MiniStatCard({ label, value, unit, color, sub, barPct }: {
         {sub && <span style={{ ...lblC, color: '#666' }}>{sub}</span>}
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, marginTop: 2 }}>
-        <span style={{ fontSize: '2.3rem', fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
-        {unit && <span style={{ fontSize: '0.95rem', fontWeight: 700, color, opacity: 0.75, marginBottom: 2 }}>{unit}</span>}
+        <span style={{ fontSize: '3.8rem', fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
+        {unit && <span style={{ fontSize: '1.5rem', fontWeight: 700, color, opacity: 0.75, marginBottom: 3 }}>{unit}</span>}
       </div>
       <Bar value={barPct} color={color} thin />
     </FilledCard>
@@ -210,14 +210,14 @@ function NetworkCardC({ metrics }: { metrics: Metrics }) {
         <span style={lblC}>Network</span>
         <span style={{ ...lblC, color: '#666' }}>{iface.iface}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{ fontSize: 13, color: '#50f095', fontWeight: 900 }}>↓</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#50f095', fontVariantNumeric: 'tabular-nums' }}>{fmtBytes(rx)}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 22, color: '#50f095', fontWeight: 900 }}>↓</span>
+        <span style={{ fontSize: 22, fontWeight: 800, color: '#50f095', fontVariantNumeric: 'tabular-nums' }}>{fmtBytes(rx)}</span>
       </div>
       <Bar value={Math.min((rx / ref) * 100, 100)} color="#50f095" thin />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-        <span style={{ fontSize: 13, color: '#556cb1', fontWeight: 900 }}>↑</span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#556cb1', fontVariantNumeric: 'tabular-nums' }}>{fmtBytes(tx)}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+        <span style={{ fontSize: 22, color: '#556cb1', fontWeight: 900 }}>↑</span>
+        <span style={{ fontSize: 22, fontWeight: 800, color: '#556cb1', fontVariantNumeric: 'tabular-nums' }}>{fmtBytes(tx)}</span>
       </div>
       <Bar value={Math.min((tx / ref) * 100, 100)} color="#556cb1" thin />
     </FilledCard>
@@ -240,8 +240,8 @@ function StorageCardC({ metrics }: { metrics: Metrics }) {
             return (
               <div key={d.mountpoint}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#ccc' }}>{d.label}</span>
-                  <span style={{ fontSize: 11, fontWeight: 900, color }}>
+                  <span style={{ fontSize: 17, fontWeight: 700, color: '#ccc' }}>{d.label}</span>
+                  <span style={{ fontSize: 17, fontWeight: 900, color }}>
                     {Math.round(d.usedPercent)}% · {fmtSize(d.used)}/{fmtSize(d.total)}
                   </span>
                 </div>
@@ -266,12 +266,12 @@ function ProcessesCardC({ metrics }: { metrics: Metrics }) {
           const color = heatColor(p.cpuPercent);
           return (
             <div key={p.pid} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, width: 18, flexShrink: 0 }}>{medals[i]}</span>
+              <span style={{ fontSize: 22, width: 26, flexShrink: 0 }}>{medals[i]}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#ddd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                <div style={{ fontSize: 17, fontWeight: 600, color: '#ddd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
                 <Bar value={Math.min(p.cpuPercent, 100)} color={color} thin />
               </div>
-              <span style={{ fontSize: 12, fontWeight: 900, color, width: 38, textAlign: 'right', flexShrink: 0 }}>{p.cpuPercent.toFixed(1)}%</span>
+              <span style={{ fontSize: 18, fontWeight: 900, color, width: 56, textAlign: 'right', flexShrink: 0 }}>{p.cpuPercent.toFixed(1)}%</span>
             </div>
           );
         })}
