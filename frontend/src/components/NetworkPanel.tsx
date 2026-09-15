@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { NetworkInterface } from '../types';
+import type { NetworkInterface, Point } from '../types';
 import Panel from './Panel';
 import Graph from './Graph';
 import { theme } from '../theme';
@@ -43,8 +43,9 @@ const UL: [string, string, string] = [theme.upload_start, theme.upload_mid, them
 
 interface Props {
   network: NetworkInterface[];
-  rxHistory: number[];
-  txHistory: number[];
+  rxHistory: Point[];
+  txHistory: Point[];
+  windowMs: number;
 }
 
 interface RowProps {
@@ -52,11 +53,12 @@ interface RowProps {
   label: string;
   color: string;
   value: number;
-  history: number[];
+  history: Point[];
+  windowMs: number;
   gradient: [string, string, string];
 }
 
-function Row({ arrow, label, color, value, history, gradient }: RowProps) {
+function Row({ arrow, label, color, value, history, windowMs, gradient }: RowProps) {
   const [scale, setScale] = useState(0);
   return (
     <div>
@@ -78,12 +80,12 @@ function Row({ arrow, label, color, value, history, gradient }: RowProps) {
         </span>
         <span style={{ whiteSpace: 'nowrap' }}>▔ {fmtScale(scale)}</span>
       </div>
-      <Graph data={history} gradient={gradient} niceMax={niceMax} onScale={setScale} height={56} />
+      <Graph data={history} windowMs={windowMs} gradient={gradient} niceMax={niceMax} onScale={setScale} height={56} />
     </div>
   );
 }
 
-export default function NetworkPanel({ network, rxHistory, txHistory }: Props) {
+export default function NetworkPanel({ network, rxHistory, txHistory, windowMs }: Props) {
   const main = network[0];
   const others = network.slice(1);
 
@@ -91,8 +93,8 @@ export default function NetworkPanel({ network, rxHistory, txHistory }: Props) {
     <Panel title="net" num="3" className="panel-net" borderColor={theme.net_box} extra={main ? main.iface : undefined}>
       {main ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Row arrow="▼" label="Download" color={theme.download_end} value={main.rxBytesPerSec} history={rxHistory} gradient={DL} />
-          <Row arrow="▲" label="Upload" color={theme.upload_end} value={main.txBytesPerSec} history={txHistory} gradient={UL} />
+          <Row arrow="▼" label="Download" color={theme.download_end} value={main.rxBytesPerSec} history={rxHistory} windowMs={windowMs} gradient={DL} />
+          <Row arrow="▲" label="Upload" color={theme.upload_end} value={main.txBytesPerSec} history={txHistory} windowMs={windowMs} gradient={UL} />
         </div>
       ) : (
         <div style={{ color: theme.graph_text, fontSize: 11 }}>no interfaces</div>

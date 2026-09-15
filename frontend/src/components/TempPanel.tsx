@@ -1,15 +1,17 @@
-import type { TemperatureInfo } from '../types';
+import type { TemperatureInfo, Point } from '../types';
 import Panel from './Panel';
 import Graph from './Graph';
 import UsageBar from './UsageBar';
 import { theme, gradAt } from '../theme';
+import { THRESHOLDS, level, levelColor } from '../thresholds';
 
 const TEMP_GRADIENT: [string, string, string] = [theme.temp_start, theme.temp_mid, theme.temp_end];
 const SCALE_MAX = 100; // °C; bars and graph share this scale
 
 interface Props {
   temperature: TemperatureInfo | null;
-  history: number[];
+  history: Point[];
+  windowMs: number;
 }
 
 // "coretemp/Package id 0" → { group: "coretemp", name: "Package id 0" }
@@ -18,9 +20,11 @@ function splitLabel(label: string) {
   return i === -1 ? { group: '', name: label } : { group: label.slice(0, i), name: label.slice(i + 1) };
 }
 
-export default function TempPanel({ temperature, history }: Props) {
+export default function TempPanel({ temperature, history, windowMs }: Props) {
   const cpu = temperature?.cpu ?? null;
-  const cpuColor = cpu === null ? theme.graph_text : gradAt(TEMP_GRADIENT, cpu / SCALE_MAX);
+  const cpuLevel = cpu === null ? 'ok' : level(cpu, THRESHOLDS.cpuTemp);
+  const cpuColor =
+    cpu === null ? theme.graph_text : levelColor(cpuLevel) ?? gradAt(TEMP_GRADIENT, cpu / SCALE_MAX);
   const sensors = temperature?.all ?? [];
 
   return (
@@ -30,9 +34,7 @@ export default function TempPanel({ temperature, history }: Props) {
       borderColor={theme.temp_box}
       bottomRight={
         sensors.length > 0 ? (
-          <>
-            <span style={{ color: theme.graph_text }}>{sensors.length} sensor{sensors.length === 1 ? '' : 's'}</span>
-          </>
+          <span style={{ color: theme.graph_text }}>{sensors.length} sensor{sensors.length === 1 ? '' : 's'}</span>
         ) : undefined
       }
     >
@@ -47,15 +49,21 @@ export default function TempPanel({ temperature, history }: Props) {
               </span>
               <span style={{ fontSize: 12, color: cpuColor, marginLeft: 3 }}>°C</span>
               <span style={{ fontSize: 11, color: theme.graph_text, marginLeft: 8 }}>cpu</span>
+              {cpuLevel !== 'ok' && (
+                <span style={{ fontSize: 11, color: cpuColor, marginLeft: 8, fontWeight: 700 }}>
+                  {cpuLevel === 'crit' ? '⚠ hot' : '⚠ warm'}
+                </span>
+              )}
             </div>
             <span style={{ fontSize: 11, color: theme.graph_text }}>▔ {SCALE_MAX}°C</span>
           </div>
 
-          <Graph data={history} max={SCALE_MAX} gradient={TEMP_GRADIENT} height={64} />
+          <Graph data={history} windowMs={windowMs} max={SCALE_MAX} gradient={TEMP_GRADIENT} height={64} />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {sensors.map((s, i) => {
               const { group, name } = splitLabel(s.label);
+              const lc = levelColor(level(s.celsius, THRESHOLDS.sensorTemp));
               return (
                 <div key={`${s.label}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span
@@ -71,7 +79,7 @@ export default function TempPanel({ temperature, history }: Props) {
                     }}
                   >
                     {group && <span style={{ color: theme.graph_text }}>{group}/</span>}
-                    <span style={{ color: theme.fg }}>{name}</span>
+                    <span style={{ color: lc ?? theme.fg }}>{name}</span>
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <UsageBar
@@ -79,6 +87,7 @@ export default function TempPanel({ temperature, history }: Props) {
                       gradient={TEMP_GRADIENT}
                       display={`${s.celsius.toFixed(0)}°C`}
                       valueWidth={40}
+                      valueColor={lc}
                     />
                   </div>
                 </div>

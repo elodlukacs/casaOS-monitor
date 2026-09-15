@@ -1,4 +1,4 @@
-import type { CpuCore, LoadAvg } from '../types';
+import type { CpuCore, LoadAvg, Point } from '../types';
 import Panel from './Panel';
 import Graph from './Graph';
 import UsageBar from './UsageBar';
@@ -8,13 +8,14 @@ const CPU_GRADIENT: [string, string, string] = [theme.cpu_start, theme.cpu_mid, 
 
 interface Props {
   cores: CpuCore[];
-  history: number[];
+  history: Point[];
+  windowMs: number;
   uptime: string;
   cpuModel: string;
   loadAvg: LoadAvg;
 }
 
-export default function CpuPanel({ cores, history, uptime, cpuModel, loadAvg }: Props) {
+export default function CpuPanel({ cores, history, windowMs, uptime, cpuModel, loadAvg }: Props) {
   const total = cores.find(c => c.name === 'cpu');
   const coreList = cores.filter(c => c.name !== 'cpu');
   // Up to 8 cores per column so many-core boxes don't turn into a tall strip.
@@ -34,7 +35,7 @@ export default function CpuPanel({ cores, history, uptime, cpuModel, loadAvg }: 
     >
       <div className="cpu-body">
         <div className="cpu-graph">
-          <Graph data={history} max={100} gradient={CPU_GRADIENT} />
+          <Graph data={history} windowMs={windowMs} max={100} gradient={CPU_GRADIENT} />
           <div
             style={{
               display: 'flex',

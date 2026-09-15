@@ -10,15 +10,24 @@ function fmtMem(bytes: number) {
   return bytes + 'B';
 }
 
+function fmtRate(bps: number) {
+  if (bps <= 0) return '';
+  if (bps >= 1048576) return (bps / 1048576).toFixed(1) + 'M';
+  if (bps >= 1024) return (bps / 1024).toFixed(0) + 'K';
+  return bps.toFixed(0) + 'B';
+}
+
 const PROC_GRAD: [string, string, string] = [theme.process_start, theme.process_mid, theme.process_end];
 
-type SortKey = 'pid' | 'name' | 'cpu' | 'mem';
-const DEFAULT_DESC: Record<SortKey, boolean> = { pid: false, name: false, cpu: true, mem: true };
+type SortKey = 'pid' | 'name' | 'cpu' | 'mem' | 'io';
+const DEFAULT_DESC: Record<SortKey, boolean> = { pid: false, name: false, cpu: true, mem: true, io: true };
+const ioOf = (p: Process) => (p.readBytesPerSec ?? 0) + (p.writeBytesPerSec ?? 0);
 const COMPARE: Record<SortKey, (a: Process, b: Process) => number> = {
   pid: (a, b) => a.pid - b.pid,
   name: (a, b) => a.name.localeCompare(b.name),
   cpu: (a, b) => a.cpuPercent - b.cpuPercent,
   mem: (a, b) => a.memBytes - b.memBytes,
+  io: (a, b) => ioOf(a) - ioOf(b),
 };
 
 interface Props {
@@ -37,6 +46,7 @@ export default function ProcessList({ processes, totalMem }: Props) {
   const [sort, setSort] = useState<SortKey>('cpu');
   const [desc, setDesc] = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
+  const hasIo = processes.some(p => p.readBytesPerSec !== undefined);
 
   const sorted = useMemo(() => {
     const arr = [...processes];
@@ -54,8 +64,9 @@ export default function ProcessList({ processes, totalMem }: Props) {
     }
   };
 
-  const th = (k: SortKey, label: string, align: 'left' | 'right', width?: number) => (
+  const th = (k: SortKey, label: string, align: 'left' | 'right', width?: number, className?: string) => (
     <th
+      className={className}
       onClick={() => onSort(k)}
       style={{ ...cell, textAlign: align, color: sort === k ? theme.title : theme.graph_text, width }}
     >
@@ -83,7 +94,9 @@ export default function ProcessList({ processes, totalMem }: Props) {
             {th('name', 'Program', 'left')}
             {th('cpu', 'Cpu%', 'right', 60)}
             {th('mem', 'Mem', 'right', 60)}
-            <th style={{ ...cell, textAlign: 'right', color: theme.graph_text, width: 52, cursor: 'default' }}>Mem%</th>
+            <th className="col-wide" style={{ ...cell, textAlign: 'right', color: theme.graph_text, width: 52, cursor: 'default' }}>Mem%</th>
+            {hasIo && th('io', 'Read', 'right', 56, 'col-wide')}
+            {hasIo && th('io', 'Write', 'right', 56, 'col-wide')}
             <th style={{ ...cell, textAlign: 'center', color: theme.graph_text, width: 20, cursor: 'default' }}>S</th>
           </tr>
         </thead>
@@ -114,7 +127,17 @@ export default function ProcessList({ processes, totalMem }: Props) {
                   {p.cpuPercent.toFixed(1)}
                 </td>
                 <td style={{ ...cell, textAlign: 'right', color: theme.hi_fg }}>{fmtMem(p.memBytes)}</td>
-                <td style={{ ...cell, textAlign: 'right', color: theme.graph_text }}>{memPct.toFixed(1)}</td>
+                <td className="col-wide" style={{ ...cell, textAlign: 'right', color: theme.graph_text }}>{memPct.toFixed(1)}</td>
+                {hasIo && (
+                  <td className="col-wide" style={{ ...cell, textAlign: 'right', color: theme.cached_mid }}>
+                    {fmtRate(p.readBytesPerSec ?? 0)}
+                  </td>
+                )}
+                {hasIo && (
+                  <td className="col-wide" style={{ ...cell, textAlign: 'right', color: theme.used_mid }}>
+                    {fmtRate(p.writeBytesPerSec ?? 0)}
+                  </td>
+                )}
                 <td style={{ ...cell, textAlign: 'center', color: theme.graph_text }}>{p.state}</td>
               </tr>
             );
