@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Metrics } from './types';
+import Graph from './Graph';
 
 interface Props {
   metrics: Metrics;
+  connected: boolean;
+  cpuHistory: number[];
   onDisconnect: () => void;
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+const CPU_GRADIENT: [string, string, string] = ['#50f095', '#f2e266', '#fa1e1e'];
 
 function heatColor(v: number) {
   if (v >= 80) return '#fa1e1e';
@@ -33,8 +38,8 @@ function fmtSize(b: number) {
 
 // ── primitives ────────────────────────────────────────────────────────────────
 
-const card: React.CSSProperties  = { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 16, padding: 20 };
-const cardC: React.CSSProperties = { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 12, padding: '10px 12px' };
+const card: React.CSSProperties  = { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 16, padding: 20, position: 'relative', overflow: 'hidden' };
+const cardC: React.CSSProperties = { background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 12, padding: '10px 12px', position: 'relative', overflow: 'hidden' };
 const lbl:  React.CSSProperties  = { fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555' } as React.CSSProperties;
 const lblC: React.CSSProperties  = { fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#555' } as React.CSSProperties;
 
@@ -47,17 +52,47 @@ function Bar({ value, color, thin }: { value: number; color: string; thin?: bool
   );
 }
 
+// History graph drawn behind a card's content (bottom part, dimmed).
+function CardGraph({ data }: { data: number[] }) {
+  return (
+    <div
+      style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: '58%',
+        display: 'flex', flexDirection: 'column', opacity: 0.5, pointerEvents: 'none',
+      }}
+    >
+      <Graph data={data} max={100} gradient={CPU_GRADIENT} pointSpacing={3} fillAlpha={0.35} />
+    </div>
+  );
+}
+
+function Status({ connected, small }: { connected: boolean; small?: boolean }) {
+  const color = connected ? '#50f095' : '#f2a33a';
+  const dot = small ? 6 : 8;
+  return (
+    <>
+      <div style={{ width: dot, height: dot, borderRadius: '50%', background: color, boxShadow: `0 0 ${small ? 5 : 6}px ${color}`, flexShrink: 0 }} />
+      <span style={{ fontSize: small ? 10 : 11, fontWeight: 600, color }}>{connected ? (small ? 'live' : 'Live') : 'reconnecting…'}</span>
+    </>
+  );
+}
+
 // ── portrait cards ────────────────────────────────────────────────────────────
 
-function BigCard({ label, value, unit, color, sub }: { label: string; value: string; unit?: string; color: string; sub?: string }) {
+function BigCard({ label, value, unit, color, sub, graph }: {
+  label: string; value: string; unit?: string; color: string; sub?: string; graph?: number[];
+}) {
   return (
     <div style={card}>
-      <div style={lbl}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, marginTop: 8 }}>
-        <span style={{ fontSize: '3.2rem', fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
-        {unit && <span style={{ fontSize: '1.1rem', fontWeight: 700, color, opacity: 0.75, marginBottom: 4 }}>{unit}</span>}
+      {graph && <CardGraph data={graph} />}
+      <div style={{ position: 'relative' }}>
+        <div style={lbl}>{label}</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, marginTop: 8 }}>
+          <span style={{ fontSize: '3.2rem', fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
+          {unit && <span style={{ fontSize: '1.1rem', fontWeight: 700, color, opacity: 0.75, marginBottom: 4 }}>{unit}</span>}
+        </div>
+        {sub && <div style={{ ...lbl, marginTop: 6 }}>{sub}</div>}
       </div>
-      {sub && <div style={{ ...lbl, marginTop: 6 }}>{sub}</div>}
     </div>
   );
 }
@@ -157,21 +192,24 @@ function ProcessesCard({ metrics }: { metrics: Metrics }) {
 
 // ── landscape compact cards (fill their flex container height) ────────────────
 
-// Generic filled card wrapper
-function FilledCard({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+// Generic filled card wrapper; optional history graph drawn behind the content
+function FilledCard({ children, style, graph }: { children: React.ReactNode; style?: React.CSSProperties; graph?: number[] }) {
   return (
-    <div style={{ ...cardC, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', ...style }}>
-      {children}
+    <div style={{ ...cardC, display: 'flex', flexDirection: 'column', ...style }}>
+      {graph && <CardGraph data={graph} />}
+      <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        {children}
+      </div>
     </div>
   );
 }
 
 // Top-row stat card: label + huge number + bar + sub, densely packed
-function MiniStatCard({ label, value, unit, color, sub, barPct }: {
-  label: string; value: string; unit?: string; color: string; sub?: string; barPct: number;
+function MiniStatCard({ label, value, unit, color, sub, barPct, graph }: {
+  label: string; value: string; unit?: string; color: string; sub?: string; barPct: number; graph?: number[];
 }) {
   return (
-    <FilledCard>
+    <FilledCard graph={graph}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <span style={lblC}>{label}</span>
         {sub && <span style={{ ...lblC, color: '#666' }}>{sub}</span>}
@@ -231,7 +269,7 @@ function StorageCardC({ metrics }: { metrics: Metrics }) {
       <div style={lblC}>Storage</div>
       {drives.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: 10, color: '#333' }}>restart backend to load</span>
+          <span style={{ fontSize: 10, color: '#333' }}>no mounted drives reported</span>
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-around' }}>
@@ -309,7 +347,7 @@ function useWakeLock() {
 
 // ── main ──────────────────────────────────────────────────────────────────────
 
-export default function Dashboard({ metrics, onDisconnect }: Props) {
+export default function Dashboard({ metrics, connected, cpuHistory, onDisconnect }: Props) {
   const [now, setNow] = useState(() => new Date());
   const landscape = useIsLandscape();
   useWakeLock();
@@ -337,14 +375,13 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontWeight: 900, fontSize: 13, color: '#ee79d3' }}>CasaOS</span>
             <span style={{ fontSize: 10, color: '#444' }}>{metrics.hostname}</span>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#50f095', boxShadow: '0 0 5px #50f095' }} />
-            <span style={{ fontSize: 10, color: '#50f095' }}>live</span>
+            <Status connected={connected} small />
             <span style={{ fontSize: 10, color: '#2a2a2a' }}>·</span>
             <span style={{ fontSize: 10, color: '#333' }}>{metrics.uptime}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#555', fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
-            <button onClick={onDisconnect} style={{ background: '#222', color: '#666', border: '1px solid #333', borderRadius: 7, padding: '2px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>✕</button>
+            <button onClick={onDisconnect} aria-label="Disconnect" style={{ background: '#222', color: '#666', border: '1px solid #333', borderRadius: 7, padding: '2px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>✕</button>
           </div>
         </div>
 
@@ -359,6 +396,7 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
               color={heatColor(cpuPct)}
               sub={`Load ${(metrics.loadAvg?.one ?? 0).toFixed(2)}`}
               barPct={cpuPct}
+              graph={cpuHistory}
             />
             <MiniStatCard
               label="Temp"
@@ -393,19 +431,18 @@ export default function Dashboard({ metrics, onDisconnect }: Props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#555', fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
-          <button onClick={onDisconnect} style={{ background: '#2a2a2a', color: '#888', border: 'none', borderRadius: 10, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✕</button>
+          <button onClick={onDisconnect} aria-label="Disconnect" style={{ background: '#2a2a2a', color: '#888', border: 'none', borderRadius: 10, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✕</button>
         </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px 4px' }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#50f095', boxShadow: '0 0 6px #50f095' }} />
-        <span style={{ fontSize: 11, fontWeight: 600, color: '#50f095' }}>Live</span>
+        <Status connected={connected} />
         <span style={{ fontSize: 11, color: '#333' }}>· uptime {metrics.uptime}</span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '10px 16px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <BigCard label="CPU" value={`${Math.round(cpuPct)}%`} color={heatColor(cpuPct)} sub={`Load ${(metrics.loadAvg?.one ?? 0).toFixed(2)}`} />
+          <BigCard label="CPU" value={`${Math.round(cpuPct)}%`} color={heatColor(cpuPct)} sub={`Load ${(metrics.loadAvg?.one ?? 0).toFixed(2)}`} graph={cpuHistory} />
           <BigCard
             label="Temp"
             value={temp !== null ? Math.round(temp).toString() : '—'}
