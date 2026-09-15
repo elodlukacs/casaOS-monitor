@@ -55,24 +55,7 @@ export interface LoadAvg {
   fifteen: number;
 }
 
-export interface HistoryPoint {
-  t: number;
-  cpu: number;
-  temp: number | null;
-  rx: number;
-  tx: number;
-}
-
-export interface HistoryMessage {
-  type: 'history';
-  stepMs: number;
-  points: HistoryPoint[];
-}
-
-export type ServerMessage = Metrics | HistoryMessage;
-
 export interface Metrics {
-  type?: 'metrics';
   timestamp: number;
   hostname: string;
   uptime: string;

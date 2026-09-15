@@ -107,6 +107,7 @@ export default function App() {
         if (disposed) return;
         setConnected(true);
         ws.send(JSON.stringify({ type: 'setInterval', ms: intervalRef.current }));
+        ws.send(JSON.stringify({ type: 'getHistory' }));
       };
       ws.onmessage = e => {
         if (disposed) return;

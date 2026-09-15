@@ -218,9 +218,7 @@ wss.on('connection', (ws) => {
   console.log(`client connected (${clients.size} total)`);
   reschedule();
 
-  // History first so graphs are filled before the first live frame lands,
-  // then a frame right away so the UI doesn't sit on "loading".
-  ws.send(JSON.stringify({ type: 'history', stepMs: HISTORY_STEP_MS, points: history }));
+  // A frame right away so the UI doesn't sit on "loading".
   const fresh = lastSample && Date.now() - lastSample.timestamp < Math.max(timerMs, 1000);
   ws.send(JSON.stringify(fresh ? lastSample : sample(true)));
   client.lastSent = Date.now();
@@ -231,6 +229,10 @@ wss.on('connection', (ws) => {
       if (msg.type === 'setInterval') {
         client.intervalMs = clampInterval(msg.ms);
         reschedule();
+      } else if (msg.type === 'getHistory') {
+        // Opt-in: clients that only understand metrics frames (the mobile
+        // app) never see this message.
+        ws.send(JSON.stringify({ type: 'history', stepMs: HISTORY_STEP_MS, points: history }));
       }
     } catch {}
   });
