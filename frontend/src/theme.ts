@@ -16,6 +16,7 @@ export const theme = {
   mem_box: '#8a882e',
   net_box: '#423ba5',
   proc_box: '#923535',
+  temp_box: '#3a5f8f',
   div_line: '#303030',
   // cpu gradient (bottom → top)
   cpu_start: '#50f095',

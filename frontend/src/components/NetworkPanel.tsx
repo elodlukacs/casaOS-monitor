@@ -88,7 +88,7 @@ export default function NetworkPanel({ network, rxHistory, txHistory }: Props) {
   const others = network.slice(1);
 
   return (
-    <Panel title="net" num="3" borderColor={theme.net_box} extra={main ? main.iface : undefined}>
+    <Panel title="net" num="3" className="panel-net" borderColor={theme.net_box} extra={main ? main.iface : undefined}>
       {main ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Row arrow="▼" label="Download" color={theme.download_end} value={main.rxBytesPerSec} history={rxHistory} gradient={DL} />

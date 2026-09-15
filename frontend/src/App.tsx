@@ -3,6 +3,7 @@ import type { Metrics } from './types';
 import CpuPanel from './components/CpuPanel';
 import MemoryPanel from './components/MemoryPanel';
 import NetworkPanel from './components/NetworkPanel';
+import TempPanel from './components/TempPanel';
 import ProcessList from './components/ProcessList';
 import { theme } from './theme';
 
@@ -19,6 +20,7 @@ interface History {
   cpu: number[];
   rx: number[];
   tx: number[];
+  temp: number[];
 }
 
 function push(arr: number[], v: number) {
@@ -53,7 +55,7 @@ export default function App() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [connected, setConnected] = useState(false);
   const [intervalMs, setIntervalMs] = useState(loadInterval);
-  const [history, setHistory] = useState<History>({ cpu: [], rx: [], tx: [] });
+  const [history, setHistory] = useState<History>({ cpu: [], rx: [], tx: [], temp: [] });
   const [now, setNow] = useState(() => new Date());
   const wsRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef(intervalMs);
@@ -87,10 +89,12 @@ export default function App() {
         setMetrics(data);
         const total = data.cpu.find(c => c.name === 'cpu');
         const iface = data.network[0];
+        const temp = data.temperature?.cpu;
         setHistory(h => ({
           cpu: total ? push(h.cpu, total.usage) : h.cpu,
           rx: iface ? push(h.rx, iface.rxBytesPerSec) : h.rx,
           tx: iface ? push(h.tx, iface.txBytesPerSec) : h.tx,
+          temp: temp !== undefined ? push(h.temp, temp) : h.temp,
         }));
       };
       ws.onerror = () => ws.close();
@@ -186,7 +190,6 @@ export default function App() {
       <CpuPanel
         cores={metrics.cpu}
         history={history.cpu}
-        temperature={metrics.temperature}
         uptime={metrics.uptime}
         cpuModel={metrics.cpuModel ?? 'CPU'}
         loadAvg={metrics.loadAvg ?? { one: 0, five: 0, fifteen: 0 }}
@@ -194,7 +197,10 @@ export default function App() {
 
       <div className="main-grid">
         <MemoryPanel memory={metrics.memory} disk={metrics.disk} storage={metrics.storage ?? []} />
-        <NetworkPanel network={metrics.network} rxHistory={history.rx} txHistory={history.tx} />
+        <div className="mid-col">
+          <NetworkPanel network={metrics.network} rxHistory={history.rx} txHistory={history.tx} />
+          <TempPanel temperature={metrics.temperature} history={history.temp} />
+        </div>
         <ProcessList processes={metrics.processes} totalMem={metrics.memory.total} />
       </div>
     </div>
