@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The backend speaks plain ws:// on the LAN, so allow cleartext everywhere.
+     (domain-config entries only match hostnames, not IP ranges, so listing
+     subnets there does nothing; base-config is what actually applies.) -->
 <network-security-config>
-    <!-- Allow cleartext (ws://) to any host on local networks -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">192.168.0.0</domain>
-        <domain includeSubdomains="true">192.168.1.0</domain>
-        <domain includeSubdomains="true">10.0.0.0</domain>
-        <domain includeSubdomains="true">10.0.1.0</domain>
-        <domain includeSubdomains="true">172.16.0.0</domain>
-        <domain includeSubdomains="true">localhost</domain>
-    </domain-config>
     <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

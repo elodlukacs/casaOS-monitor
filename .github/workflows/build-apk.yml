@@ -3,6 +3,10 @@ name: Build Android APK
 on:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
@@ -28,6 +32,11 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's default package list includes the legacy 'tools'
+          # package, which Google removed from the SDK repository, so
+          # sdkmanager exits 1. List what the build actually needs instead.
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
 
       - name: Install mobile dependencies
         working-directory: mobile

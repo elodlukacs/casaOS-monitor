@@ -1,18 +1,18 @@
 import { theme, gradAt } from '../theme';
 
 interface UsageBarProps {
-  label: string;
+  label?: string;
   value: number; // 0-100
   total?: string;
-  // Optional gradient stops for a meter that colors by fill level
-  gradient?: [string, string, string];
+  gradient?: [string, string, string]; // colour by fill level
   color?: string;
   labelColor?: string;
-  width?: number; // cells; passed to flex layout implicitly
+  labelWidth?: number;
+  display?: string;    // text shown after the bar; defaults to the percentage
+  valueWidth?: number;
 }
 
-// btop-style meter: a row of block characters that gradient-color by level.
-// We render a solid bar with CSS width, over a dark meter_bg track.
+// btop-style meter: a track with a fill whose colour follows the level.
 export default function UsageBar({
   label,
   value,
@@ -20,6 +20,9 @@ export default function UsageBar({
   gradient,
   color,
   labelColor = theme.graph_text,
+  labelWidth = 52,
+  display,
+  valueWidth = 34,
 }: UsageBarProps) {
   const pct = Math.min(100, Math.max(0, value));
   const fill = color ?? (gradient ? gradAt(gradient, pct / 100) : theme.fg);
@@ -31,20 +34,21 @@ export default function UsageBar({
         alignItems: 'center',
         gap: 6,
         marginBottom: 2,
-        fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11,
-        lineHeight: '14px',
+        lineHeight: '15px',
       }}
     >
-      <span style={{ color: labelColor, minWidth: 48, flexShrink: 0 }}>{label}</span>
+      {label !== undefined && (
+        <span style={{ color: labelColor, minWidth: labelWidth, flexShrink: 0 }}>{label}</span>
+      )}
       <div
         style={{
           flex: 1,
-          height: 10,
+          height: 9,
           backgroundColor: theme.meter_bg,
           position: 'relative',
           overflow: 'hidden',
-          flexShrink: 1,
+          minWidth: 0,
         }}
       >
         <div
@@ -61,11 +65,11 @@ export default function UsageBar({
           }}
         />
       </div>
-      <span style={{ color: theme.fg, minWidth: 38, textAlign: 'right', flexShrink: 0 }}>
-        {pct.toFixed(0)}%
+      <span style={{ color: theme.fg, minWidth: valueWidth, textAlign: 'right', flexShrink: 0 }}>
+        {display ?? `${pct.toFixed(0)}%`}
       </span>
       {total && (
-        <span style={{ color: theme.hi_fg, minWidth: 62, flexShrink: 0, textAlign: 'right' }}>
+        <span style={{ color: theme.hi_fg, minWidth: 54, flexShrink: 0, textAlign: 'right' }}>
           {total}
         </span>
       )}

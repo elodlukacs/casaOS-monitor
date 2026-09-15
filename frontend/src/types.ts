@@ -6,7 +6,8 @@ export interface CpuCore {
 export interface MemoryInfo {
   total: number;
   used: number;
-  free: number;
+  free: number;       // MemFree: truly unused
+  available: number;  // MemAvailable: free + reclaimable cache
   buffers: number;
   cached: number;
   usedPercent: number;
@@ -33,6 +34,7 @@ export interface DiskInfo {
 export interface StorageInfo {
   mountpoint: string;
   label: string;
+  device?: string; // block device basename, e.g. sda2 / nvme0n1p2
   total: number;
   used: number;
   free: number;

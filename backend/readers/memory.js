@@ -11,9 +11,12 @@ function getMemoryInfo() {
   });
 
   const total = map['MemTotal'] || 0;
-  const available = map['MemAvailable'] || 0;
+  const free = map['MemFree'] || 0;
+  // MemAvailable already accounts for reclaimable cache/buffers; older kernels
+  // lack it, so approximate the same way the kernel does.
+  const available = map['MemAvailable'] ?? (free + (map['Buffers'] || 0) + (map['Cached'] || 0));
   const buffers = map['Buffers'] || 0;
-  const cached = map['Cached'] || 0;
+  const cached = (map['Cached'] || 0) + (map['SReclaimable'] || 0);
   const swapTotal = map['SwapTotal'] || 0;
   const swapFree = map['SwapFree'] || 0;
   const used = total - available;
@@ -21,7 +24,8 @@ function getMemoryInfo() {
   return {
     total,
     used,
-    free: available,
+    free,
+    available,
     buffers,
     cached,
     usedPercent: total > 0 ? (used / total) * 100 : 0,

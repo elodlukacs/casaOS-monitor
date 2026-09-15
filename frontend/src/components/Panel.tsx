@@ -4,17 +4,17 @@ import { theme } from '../theme';
 interface PanelProps {
   num?: string | number;
   title: string;
-  extra?: React.ReactNode;     // trailing title info like "cpu  1  (3500MHz)"
+  extra?: React.ReactNode;       // trailing title info, e.g. the interface name
   borderColor?: string;
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
-  bottomRight?: React.ReactNode; // info in bottom-right chrome slot
+  bottomRight?: React.ReactNode; // info in the bottom-right border slot
 }
 
-// btop renders box chrome as text: ┌─┤ title N ├─…─┐  │…│  └──…──┘
-// We emulate with CSS border + absolutely-positioned title/footer spans
-// that overlay the border using background-color "cuts".
+// btop draws box chrome as text: ┌─┤ title N ├─…─┐ … └──┤ info ├─┘
+// Emulated with a CSS border plus absolutely positioned labels that cut the
+// border using the background colour.
 export default function Panel({
   num,
   title,
@@ -26,8 +26,8 @@ export default function Panel({
   bottomRight,
 }: PanelProps) {
   return (
-    <div
-      className={className}
+    <section
+      className={className ? `panel ${className}` : 'panel'}
       style={{
         position: 'relative',
         border: `1px solid ${borderColor}`,
@@ -35,15 +35,14 @@ export default function Panel({
         ...style,
       }}
     >
-      {/* top-left title: ┤ title N ├ */}
       <span
         style={{
           position: 'absolute',
           top: -8,
           left: 8,
+          zIndex: 1,
           backgroundColor: theme.bg,
           padding: '0 2px',
-          fontFamily: "'JetBrains Mono', monospace",
           fontSize: 12,
           lineHeight: '14px',
           userSelect: 'none',
@@ -58,11 +57,7 @@ export default function Panel({
             <span style={{ color: theme.hi_fg, fontWeight: 700 }}>{num}</span>
           </>
         )}
-        {extra && (
-          <>
-            <span style={{ color: theme.graph_text }}> {extra}</span>
-          </>
-        )}
+        {extra && <span style={{ color: theme.graph_text }}> {extra}</span>}
         <span style={{ color: borderColor }}> ├</span>
       </span>
 
@@ -72,9 +67,9 @@ export default function Panel({
             position: 'absolute',
             bottom: -8,
             right: 10,
+            zIndex: 1,
             backgroundColor: theme.bg,
             padding: '0 4px',
-            fontFamily: "'JetBrains Mono', monospace",
             fontSize: 11,
             lineHeight: '14px',
             userSelect: 'none',
@@ -88,7 +83,7 @@ export default function Panel({
         </span>
       )}
 
-      <div style={{ padding: '12px 12px 10px' }}>{children}</div>
-    </div>
+      <div className="panel-body">{children}</div>
+    </section>
   );
 }

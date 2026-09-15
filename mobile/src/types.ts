@@ -7,6 +7,7 @@ export interface MemoryInfo {
   total: number;
   used: number;
   free: number;
+  available?: number;
   buffers: number;
   cached: number;
   usedPercent: number;
@@ -28,6 +29,7 @@ export interface DiskInfo {
 export interface StorageInfo {
   mountpoint: string;
   label: string;
+  device?: string;
   total: number;
   used: number;
   free: number;

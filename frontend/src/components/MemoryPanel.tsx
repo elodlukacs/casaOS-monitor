@@ -4,6 +4,7 @@ import UsageBar from './UsageBar';
 import { theme } from '../theme';
 
 function fmtBytes(bytes: number) {
+  if (bytes >= 1099511627776) return (bytes / 1099511627776).toFixed(1) + 'T';
   if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + 'G';
   if (bytes >= 1048576) return (bytes / 1048576).toFixed(0) + 'M';
   if (bytes >= 1024) return (bytes / 1024).toFixed(0) + 'K';
@@ -17,6 +18,15 @@ function fmtSpeed(bps: number) {
   return bps.toFixed(0) + 'B/s';
 }
 
+// /proc/diskstats I/O is per whole disk; mounts are partitions. sda2 → sda,
+// nvme0n1p2 → nvme0n1, mmcblk0p1 → mmcblk0.
+function parentDisk(device?: string) {
+  if (!device) return undefined;
+  if (/^(nvme\d+n\d+|mmcblk\d+)p\d+$/.test(device)) return device.replace(/p\d+$/, '');
+  if (/^(sd|vd|hd|xvd)[a-z]+\d+$/.test(device)) return device.replace(/\d+$/, '');
+  return device;
+}
+
 interface Props {
   memory: MemoryInfo;
   disk: DiskInfo[];
@@ -28,19 +38,24 @@ const AVAIL: [string, string, string] = [theme.available_start, theme.available_
 const CACHED: [string, string, string] = [theme.cached_start, theme.cached_mid, theme.cached_end];
 const FREE: [string, string, string] = [theme.free_start, theme.free_mid, theme.free_end];
 
-// Match mobile: filter out tiny/pseudo mounts
 const MIN_MOUNT_SIZE = 1024 * 1024 * 1024;
 
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <div style={{ fontSize: 10, color: theme.graph_text, margin: '10px 0 4px', letterSpacing: '0.08em' }}>
+      {children}
+    </div>
+  );
+}
+
 export default function MemoryPanel({ memory, disk, storage }: Props) {
-  const available = memory.free + memory.buffers + memory.cached;
-  const availPct = memory.total > 0 ? (available / memory.total) * 100 : 0;
-  const cachedPct = memory.total > 0 ? (memory.cached / memory.total) * 100 : 0;
-  const freePct = memory.total > 0 ? (memory.free / memory.total) * 100 : 0;
+  const pct = (v: number) => (memory.total > 0 ? (v / memory.total) * 100 : 0);
+  // older backends sent MemAvailable as `free`; fall back so nothing shows 0
+  const available = memory.available ?? memory.free;
 
   const drives = (storage ?? []).filter(s => s.total > MIN_MOUNT_SIZE);
-  // index disk I/O by label (mount basename) for per-mount overlay
-  const ioByDevice = new Map<string, DiskInfo>();
-  for (const d of disk ?? []) ioByDevice.set(d.device, d);
+  const ioByDisk = new Map<string, DiskInfo>();
+  for (const d of disk ?? []) ioByDisk.set(d.device, d);
 
   return (
     <Panel
@@ -54,79 +69,62 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
         </>
       }
     >
-      <UsageBar label="Used"      value={memory.usedPercent} total={fmtBytes(memory.used)}   gradient={USED}   />
-      <UsageBar label="Available" value={availPct}           total={fmtBytes(available)}      gradient={AVAIL}  />
-      <UsageBar label="Cached"    value={cachedPct}          total={fmtBytes(memory.cached)}  gradient={CACHED} />
-      <UsageBar label="Free"      value={freePct}            total={fmtBytes(memory.free)}    gradient={FREE}   />
+      <UsageBar label="Used"      value={memory.usedPercent} total={fmtBytes(memory.used)}   gradient={USED}   labelWidth={72} />
+      <UsageBar label="Available" value={pct(available)}     total={fmtBytes(available)}     gradient={AVAIL}  labelWidth={72} />
+      <UsageBar label="Cached"    value={pct(memory.cached)} total={fmtBytes(memory.cached)} gradient={CACHED} labelWidth={72} />
+      <UsageBar label="Free"      value={pct(memory.free)}   total={fmtBytes(memory.free)}   gradient={FREE}   labelWidth={72} />
 
       {memory.swap.total > 0 && (
-        <div style={{ marginTop: 6 }}>
-          <div style={{ fontSize: 10, color: theme.graph_text, marginBottom: 2, letterSpacing: '0.08em' }}>
-            ─ swap ─
-          </div>
-          <UsageBar label="Swap" value={memory.swap.usedPercent} total={fmtBytes(memory.swap.used)} gradient={USED} />
-        </div>
+        <>
+          <SectionLabel>─ swap ─</SectionLabel>
+          <UsageBar label="Swap" value={memory.swap.usedPercent} total={fmtBytes(memory.swap.used)} gradient={USED} labelWidth={72} />
+        </>
       )}
 
       {drives.length > 0 && (
-        <div style={{ marginTop: 8, paddingTop: 6, borderTop: `1px solid ${theme.div_line}` }}>
-          <div style={{ fontSize: 10, color: theme.graph_text, marginBottom: 4, letterSpacing: '0.08em' }}>
-            ─ disks ─
-          </div>
-          {drives.map(d => {
-            const io = ioByDevice.get(d.label);
-            return (
-              <div key={d.mountpoint} style={{ marginBottom: 4 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: 10,
-                    lineHeight: '14px',
-                    fontFamily: "'JetBrains Mono', monospace",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: theme.fg,
-                      maxWidth: 120,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                    title={d.mountpoint}
-                  >
-                    {d.label}
-                  </span>
-                  <span style={{ color: theme.graph_text }}>
-                    {fmtBytes(d.used)}<span style={{ color: theme.inactive_fg }}>/</span>{fmtBytes(d.total)}
-                  </span>
-                </div>
-                <UsageBar
-                  label={d.mountpoint.length > 12 ? '…' + d.mountpoint.slice(-11) : d.mountpoint}
-                  value={d.usedPercent}
-                  gradient={USED}
-                />
-                {io && (io.readBytesPerSec > 0 || io.writeBytesPerSec > 0) && (
+        <>
+          <SectionLabel>─ disks ─</SectionLabel>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {drives.map(d => {
+              const io = ioByDisk.get(parentDisk(d.device) ?? '');
+              const busy = io !== undefined && (io.readBytesPerSec > 0 || io.writeBytesPerSec > 0);
+              return (
+                <div key={d.mountpoint}>
                   <div
                     style={{
                       display: 'flex',
-                      justifyContent: 'flex-end',
-                      gap: 10,
-                      fontSize: 10,
-                      lineHeight: '14px',
-                      fontFamily: "'JetBrains Mono', monospace",
-                      marginTop: 1,
+                      justifyContent: 'space-between',
+                      alignItems: 'baseline',
+                      gap: 8,
+                      fontSize: 11,
+                      lineHeight: '15px',
                     }}
                   >
-                    <span style={{ color: theme.cached_mid }}>↓{fmtSpeed(io.readBytesPerSec)}</span>
-                    <span style={{ color: theme.used_mid }}>↑{fmtSpeed(io.writeBytesPerSec)}</span>
+                    <span
+                      style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={d.mountpoint}
+                    >
+                      <span style={{ color: theme.fg }}>{d.label}</span>
+                      {d.mountpoint !== '/' && d.label !== d.mountpoint && (
+                        <span style={{ color: theme.graph_text }}> {d.mountpoint}</span>
+                      )}
+                    </span>
+                    <span style={{ color: theme.hi_fg, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {busy && (
+                        <>
+                          <span style={{ color: theme.cached_mid }}>↓{fmtSpeed(io.readBytesPerSec)}</span>{' '}
+                          <span style={{ color: theme.used_mid }}>↑{fmtSpeed(io.writeBytesPerSec)}</span>{'   '}
+                        </>
+                      )}
+                      {fmtBytes(d.used)}<span style={{ color: theme.inactive_fg }}>/</span>{fmtBytes(d.total)}
+                    </span>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <UsageBar value={d.usedPercent} gradient={USED} />
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </Panel>
   );

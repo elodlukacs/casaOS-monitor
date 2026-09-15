@@ -13,120 +13,114 @@ function fmtMem(bytes: number) {
 const PROC_GRAD: [string, string, string] = [theme.process_start, theme.process_mid, theme.process_end];
 
 type SortKey = 'pid' | 'name' | 'cpu' | 'mem';
+const DEFAULT_DESC: Record<SortKey, boolean> = { pid: false, name: false, cpu: true, mem: true };
+const COMPARE: Record<SortKey, (a: Process, b: Process) => number> = {
+  pid: (a, b) => a.pid - b.pid,
+  name: (a, b) => a.name.localeCompare(b.name),
+  cpu: (a, b) => a.cpuPercent - b.cpuPercent,
+  mem: (a, b) => a.memBytes - b.memBytes,
+};
 
 interface Props {
   processes: Process[];
   totalMem: number;
 }
 
-const cellStyle: React.CSSProperties = {
-  padding: '1px 6px 1px 0',
-  fontFamily: "'JetBrains Mono', monospace",
+const cell: React.CSSProperties = {
+  padding: '2px 8px 2px 0',
   fontSize: 11,
   whiteSpace: 'nowrap',
-  lineHeight: '16px',
+  lineHeight: '17px',
 };
 
 export default function ProcessList({ processes, totalMem }: Props) {
   const [sort, setSort] = useState<SortKey>('cpu');
+  const [desc, setDesc] = useState(true);
   const [selected, setSelected] = useState<number | null>(null);
 
   const sorted = useMemo(() => {
     const arr = [...processes];
-    arr.sort((a, b) => {
-      switch (sort) {
-        case 'pid': return a.pid - b.pid;
-        case 'name': return a.name.localeCompare(b.name);
-        case 'mem': return b.memBytes - a.memBytes;
-        case 'cpu':
-        default: return b.cpuPercent - a.cpuPercent;
-      }
-    });
+    const sign = desc ? -1 : 1;
+    arr.sort((a, b) => sign * COMPARE[sort](a, b));
     return arr;
-  }, [processes, sort]);
+  }, [processes, sort, desc]);
 
-  const arrow = (k: SortKey) => (sort === k ? ' ▼' : '');
-  const headerCell = (k: SortKey, label: string, align: 'left' | 'right' | 'center' = 'left', width?: number): React.CSSProperties => ({
-    ...cellStyle,
-    textAlign: align,
-    fontWeight: 'normal',
-    color: sort === k ? theme.title : theme.graph_text,
-    cursor: 'pointer',
-    userSelect: 'none',
-    width,
-  });
+  const onSort = (k: SortKey) => {
+    if (k === sort) {
+      setDesc(d => !d);
+    } else {
+      setSort(k);
+      setDesc(DEFAULT_DESC[k]);
+    }
+  };
+
+  const th = (k: SortKey, label: string, align: 'left' | 'right', width?: number) => (
+    <th
+      onClick={() => onSort(k)}
+      style={{ ...cell, textAlign: align, color: sort === k ? theme.title : theme.graph_text, width }}
+    >
+      {label}{sort === k ? (desc ? ' ▼' : ' ▲') : ''}
+    </th>
+  );
 
   return (
     <Panel
       title="proc"
       num="4"
+      className="panel-proc"
       borderColor={theme.proc_box}
       bottomRight={
         <>
-          <span style={{ color: theme.graph_text }}>sorted by </span>
+          <span style={{ color: theme.graph_text }}>{processes.length} shown · sorted by </span>
           <span style={{ color: theme.proc_misc }}>{sort}</span>
         </>
       }
-      style={{ height: '100%' }}
     >
-      <div style={{ overflowY: 'auto', maxHeight: 560 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${theme.div_line}` }}>
-              <th onClick={() => setSort('pid')}  style={headerCell('pid',  'Pid',     'left',   64)}>Pid{arrow('pid')}</th>
-              <th onClick={() => setSort('name')} style={headerCell('name', 'Program', 'left')}>Program{arrow('name')}</th>
-              <th onClick={() => setSort('cpu')}  style={headerCell('cpu',  'Cpu%',    'right',  62)}>Cpu%{arrow('cpu')}</th>
-              <th onClick={() => setSort('mem')}  style={headerCell('mem',  'Mem',     'right',  60)}>Mem{arrow('mem')}</th>
-              <th style={{ ...cellStyle, textAlign: 'right', fontWeight: 'normal', color: theme.graph_text, width: 54 }}>Mem%</th>
-              <th style={{ ...cellStyle, textAlign: 'center', fontWeight: 'normal', color: theme.graph_text, width: 22 }}>S</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map(p => {
-              const memPct = totalMem > 0 ? (p.memBytes / totalMem) * 100 : 0;
-              const cpuColor = gradAt(PROC_GRAD, Math.min(1, p.cpuPercent / 100));
-              const isSel = selected === p.pid;
-              return (
-                <tr
-                  key={p.pid}
-                  onClick={() => setSelected(isSel ? null : p.pid)}
+      <table className="proc-table">
+        <thead>
+          <tr>
+            {th('pid', 'Pid', 'left', 60)}
+            {th('name', 'Program', 'left')}
+            {th('cpu', 'Cpu%', 'right', 60)}
+            {th('mem', 'Mem', 'right', 60)}
+            <th style={{ ...cell, textAlign: 'right', color: theme.graph_text, width: 52, cursor: 'default' }}>Mem%</th>
+            <th style={{ ...cell, textAlign: 'center', color: theme.graph_text, width: 20, cursor: 'default' }}>S</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(p => {
+            const memPct = totalMem > 0 ? (p.memBytes / totalMem) * 100 : 0;
+            const isSel = selected === p.pid;
+            return (
+              <tr
+                key={p.pid}
+                onClick={() => setSelected(isSel ? null : p.pid)}
+                style={{ backgroundColor: isSel ? theme.selected_bg : undefined }}
+              >
+                <td style={{ ...cell, color: theme.graph_text }}>{p.pid}</td>
+                <td
                   style={{
-                    backgroundColor: isSel ? theme.selected_bg : 'transparent',
-                    cursor: 'pointer',
+                    ...cell,
+                    color: isSel ? theme.selected_fg : theme.fg,
+                    maxWidth: 0, // let the column shrink so ellipsis works
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
-                  onMouseEnter={e => { if (!isSel) e.currentTarget.style.backgroundColor = '#252525'; }}
-                  onMouseLeave={e => { if (!isSel) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                  title={p.name}
                 >
-                  <td style={{ ...cellStyle, color: theme.graph_text }}>{p.pid}</td>
-                  <td
-                    style={{
-                      ...cellStyle,
-                      color: isSel ? theme.selected_fg : theme.fg,
-                      maxWidth: 220,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {p.name}
-                  </td>
-                  <td style={{ ...cellStyle, textAlign: 'right', color: cpuColor }}>
-                    {p.cpuPercent.toFixed(1)}
-                  </td>
-                  <td style={{ ...cellStyle, textAlign: 'right', color: theme.hi_fg }}>
-                    {fmtMem(p.memBytes)}
-                  </td>
-                  <td style={{ ...cellStyle, textAlign: 'right', color: theme.graph_text }}>
-                    {memPct.toFixed(1)}
-                  </td>
-                  <td style={{ ...cellStyle, textAlign: 'center', color: theme.graph_text }}>
-                    {p.state}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  {p.name}
+                </td>
+                <td style={{ ...cell, textAlign: 'right', color: gradAt(PROC_GRAD, Math.min(1, p.cpuPercent / 100)) }}>
+                  {p.cpuPercent.toFixed(1)}
+                </td>
+                <td style={{ ...cell, textAlign: 'right', color: theme.hi_fg }}>{fmtMem(p.memBytes)}</td>
+                <td style={{ ...cell, textAlign: 'right', color: theme.graph_text }}>{memPct.toFixed(1)}</td>
+                <td style={{ ...cell, textAlign: 'center', color: theme.graph_text }}>{p.state}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </Panel>
   );
 }
