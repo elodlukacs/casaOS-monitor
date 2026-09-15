@@ -74,6 +74,7 @@ function getStorageInfo() {
       results.push({
         mountpoint: hostPath,
         label: shortLabel(hostPath),
+        device: device.split('/').pop(),
         total,
         used,
         free,

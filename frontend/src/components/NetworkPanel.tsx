@@ -1,13 +1,14 @@
+import { useState } from 'react';
 import type { NetworkInterface } from '../types';
 import Panel from './Panel';
-import BrailleGraph from './BrailleGraph';
+import Graph from './Graph';
 import { theme } from '../theme';
 
-function fmtSpeed(bps: number) {
+function fmtBits(bps: number) {
   const bits = bps * 8;
-  if (bits >= 1_000_000_000) return (bits / 1_000_000_000).toFixed(2) + ' Gbps';
-  if (bits >= 1_000_000) return (bits / 1_000_000).toFixed(2) + ' Mbps';
-  if (bits >= 1_000) return (bits / 1_000).toFixed(1) + ' Kbps';
+  if (bits >= 1e9) return (bits / 1e9).toFixed(2) + ' Gbps';
+  if (bits >= 1e6) return (bits / 1e6).toFixed(2) + ' Mbps';
+  if (bits >= 1e3) return (bits / 1e3).toFixed(1) + ' Kbps';
   return bits.toFixed(0) + ' bps';
 }
 
@@ -18,11 +19,23 @@ function fmtBytes(bps: number) {
   return bps.toFixed(0) + ' B/s';
 }
 
-function scaleLabel(max: number) {
-  if (max >= 1073741824) return (max / 1073741824).toFixed(1) + ' GiB';
-  if (max >= 1048576) return (max / 1048576).toFixed(0) + ' MiB';
-  if (max >= 1024) return (max / 1024).toFixed(0) + ' KiB';
-  return max.toFixed(0) + ' B';
+function fmtScale(max: number) {
+  const trim = (s: string) => s.replace(/\.0$/, '');
+  if (max >= 1073741824) return trim((max / 1073741824).toFixed(1)) + ' GiB/s';
+  if (max >= 1048576) return trim((max / 1048576).toFixed(1)) + ' MiB/s';
+  if (max >= 1024) return trim((max / 1024).toFixed(1)) + ' KiB/s';
+  return max.toFixed(0) + ' B/s';
+}
+
+// Round an auto scale up to a readable step (1, 1.5, 2, 3, 4, 5, 6, 8, 10 ...)
+// in the current binary unit, so the axis label is never "37.2 MiB/s".
+const NICE = [1, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300, 400, 500, 600, 800, 1024];
+function niceMax(raw: number) {
+  const v = Math.max(raw, 1024);
+  const n = Math.floor(Math.log(v) / Math.log(1024));
+  const unit = 1024 ** n;
+  const m = v / unit;
+  return (NICE.find(x => x >= m) ?? 1024) * unit;
 }
 
 const DL: [string, string, string] = [theme.download_start, theme.download_mid, theme.download_end];
@@ -34,78 +47,68 @@ interface Props {
   txHistory: number[];
 }
 
+interface RowProps {
+  arrow: string;
+  label: string;
+  color: string;
+  value: number;
+  history: number[];
+  gradient: [string, string, string];
+}
+
+function Row({ arrow, label, color, value, history, gradient }: RowProps) {
+  const [scale, setScale] = useState(0);
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: 8,
+          fontSize: 11,
+          color: theme.graph_text,
+          marginBottom: 4,
+        }}
+      >
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <span style={{ color }}>{arrow} {label} </span>
+          <span style={{ color: theme.fg }}>{fmtBits(value)}</span>
+          <span> · {fmtBytes(value)}</span>
+        </span>
+        <span style={{ whiteSpace: 'nowrap' }}>▔ {fmtScale(scale)}</span>
+      </div>
+      <Graph data={history} gradient={gradient} niceMax={niceMax} onScale={setScale} height={56} />
+    </div>
+  );
+}
+
 export default function NetworkPanel({ network, rxHistory, txHistory }: Props) {
   const main = network[0];
-  const rxMax = Math.max(...rxHistory, 1024);
-  const txMax = Math.max(...txHistory, 1024);
+  const others = network.slice(1);
 
   return (
-    <Panel
-      title="net"
-      num="3"
-      borderColor={theme.net_box}
-      extra={main ? main.iface : undefined}
-    >
-      {main && (
-        <>
-          <div style={{ position: 'relative', marginBottom: 8 }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                fontSize: 10,
-                color: theme.graph_text,
-                marginBottom: 2,
-              }}
-            >
-              <span>
-                <span style={{ color: theme.download_end }}>▼ Download </span>
-                <span style={{ color: theme.fg }}>{fmtSpeed(main.rxBytesPerSec)}</span>
-                <span style={{ color: theme.graph_text }}> · {fmtBytes(main.rxBytesPerSec)}</span>
-              </span>
-              <span>{scaleLabel(rxMax)}</span>
-            </div>
-            <BrailleGraph data={rxHistory} max={rxMax} height={3} color={theme.download_end} gradient={DL} />
-          </div>
-
-          <div style={{ position: 'relative' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                fontSize: 10,
-                color: theme.graph_text,
-                marginBottom: 2,
-              }}
-            >
-              <span>
-                <span style={{ color: theme.upload_end }}>▲ Upload </span>
-                <span style={{ color: theme.fg }}>{fmtSpeed(main.txBytesPerSec)}</span>
-                <span style={{ color: theme.graph_text }}> · {fmtBytes(main.txBytesPerSec)}</span>
-              </span>
-              <span>{scaleLabel(txMax)}</span>
-            </div>
-            <BrailleGraph data={txHistory} max={txMax} height={3} color={theme.upload_end} gradient={UL} />
-          </div>
-        </>
+    <Panel title="net" num="3" borderColor={theme.net_box} extra={main ? main.iface : undefined}>
+      {main ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <Row arrow="▼" label="Download" color={theme.download_end} value={main.rxBytesPerSec} history={rxHistory} gradient={DL} />
+          <Row arrow="▲" label="Upload" color={theme.upload_end} value={main.txBytesPerSec} history={txHistory} gradient={UL} />
+        </div>
+      ) : (
+        <div style={{ color: theme.graph_text, fontSize: 11 }}>no interfaces</div>
       )}
 
-      {network.slice(1).length > 0 && (
-        <div style={{ marginTop: 8, paddingTop: 6, borderTop: `1px solid ${theme.div_line}` }}>
-          {network.slice(1).map(iface => (
+      {others.length > 0 && (
+        <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${theme.div_line}` }}>
+          {others.map(iface => (
             <div
               key={iface.iface}
-              style={{
-                fontSize: 10,
-                display: 'flex',
-                justifyContent: 'space-between',
-                lineHeight: '14px',
-              }}
+              style={{ fontSize: 11, display: 'flex', justifyContent: 'space-between', gap: 8, lineHeight: '16px' }}
             >
-              <span style={{ color: theme.graph_text }}>{iface.iface}</span>
-              <span>
+              <span style={{ color: theme.graph_text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {iface.iface}
+              </span>
+              <span style={{ whiteSpace: 'nowrap' }}>
                 <span style={{ color: theme.download_end }}>▼ {fmtBytes(iface.rxBytesPerSec)}</span>
                 {'  '}
                 <span style={{ color: theme.upload_end }}>▲ {fmtBytes(iface.txBytesPerSec)}</span>

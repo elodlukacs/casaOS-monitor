@@ -5,10 +5,99 @@
 @tailwind utilities;
 
 * { box-sizing: border-box; }
+html, body, #root { height: 100%; }
 body {
   margin: 0;
   background: #1a1a1a;
+  color: #cccccc;
   font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── page layout: header / cpu / (mem | net | proc), fills the viewport ── */
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  overflow: auto;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 0 2px;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.interval-group { display: flex; gap: 2px; }
+.interval-btn {
+  background: none;
+  border: 1px solid transparent;
+  color: #606060;
+  font: inherit;
+  letter-spacing: 0;
+  padding: 1px 7px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.interval-btn:hover { color: #cccccc; border-color: #303030; }
+.interval-btn.active { color: #0de756; border-color: #3d7b46; }
+
+/* mem and net always show in full; proc takes the remaining height and
+   scrolls inside. The page itself only scrolls if mem/net outgrow it. */
+.main-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(300px, 26%) minmax(300px, 26%) minmax(0, 1fr);
+  grid-template-rows: minmax(auto, 1fr);
+  gap: 12px;
+}
+
+/* ── panels ── */
+.panel { display: flex; flex-direction: column; }
+.panel-body { flex: 1; min-height: 0; padding: 14px 12px 10px; }
+.panel-proc { min-height: 0; }
+.panel-proc .panel-body { overflow: auto; }
+
+/* ── cpu panel ── */
+.cpu-body { display: flex; gap: 14px; min-height: 170px; }
+.cpu-graph { flex: 1 1 0; min-width: 40%; min-height: 150px; display: flex; flex-direction: column; }
+.cpu-divider { width: 1px; flex-shrink: 0; }
+.cpu-side { flex: 0 1 auto; }
+
+/* ── process table ── */
+.proc-table { width: 100%; border-collapse: collapse; }
+.proc-table th {
+  position: sticky;
+  top: 0;
+  background: #1a1a1a;
+  font-weight: normal;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: inset 0 -1px 0 #303030;
+}
+.proc-table tbody tr { cursor: pointer; }
+.proc-table tbody tr:hover { background: #252525; }
+
+/* ── responsive ── */
+@media (max-width: 1100px) {
+  .main-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(280px, 1fr); }
+  .panel-proc { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .app { height: auto; min-height: 100%; }
+  .cpu-body { flex-direction: column; }
+  .cpu-divider { display: none; }
+  .cpu-side { width: auto !important; max-width: none !important; }
+  .main-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  /* no height cap here: the page scrolls; the table can still scroll sideways */
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }

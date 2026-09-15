@@ -1,6 +1,6 @@
 import type { CpuCore, TemperatureInfo, LoadAvg } from '../types';
 import Panel from './Panel';
-import BrailleGraph from './BrailleGraph';
+import Graph from './Graph';
 import UsageBar from './UsageBar';
 import { theme, gradAt } from '../theme';
 
@@ -19,8 +19,10 @@ interface Props {
 export default function CpuPanel({ cores, history, temperature, uptime, cpuModel, loadAvg }: Props) {
   const total = cores.find(c => c.name === 'cpu');
   const coreList = cores.filter(c => c.name !== 'cpu');
+  // Up to 8 cores per column so many-core boxes don't turn into a tall strip.
+  const cols = Math.min(3, Math.max(1, Math.ceil(coreList.length / 8)));
   const tempPct = temperature ? Math.min(1, Math.max(0, (temperature.cpu - 20) / 80)) : 0;
-  const tempC = temperature ? gradAt(TEMP_GRADIENT, tempPct) : theme.fg;
+  const tempColor = temperature ? gradAt(TEMP_GRADIENT, tempPct) : theme.fg;
 
   return (
     <Panel
@@ -34,49 +36,50 @@ export default function CpuPanel({ cores, history, temperature, uptime, cpuModel
         </>
       }
     >
-      <div style={{ display: 'flex', gap: 0, minHeight: 140 }}>
-        {/* Left: tall braille history graph with vertical gradient */}
-        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <BrailleGraph
-            data={history}
-            max={100}
-            height={7}
-            color={theme.cpu_start}
-            gradient={CPU_GRADIENT}
-          />
+      <div className="cpu-body">
+        <div className="cpu-graph">
+          <Graph data={history} max={100} gradient={CPU_GRADIENT} />
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-              fontSize: 10,
+              gap: 12,
+              fontSize: 11,
               color: theme.graph_text,
-              marginTop: 6,
-              paddingRight: 6,
+              marginTop: 8,
             }}
           >
-            <span>
+            <span style={{ whiteSpace: 'nowrap' }}>
               Load{' '}
               <span style={{ color: theme.fg }}>
                 {loadAvg.one.toFixed(2)} {loadAvg.five.toFixed(2)} {loadAvg.fifteen.toFixed(2)}
               </span>
             </span>
-            <span style={{ color: theme.graph_text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: 8 }}>
+            <span
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              title={cpuModel}
+            >
               {cpuModel}
             </span>
           </div>
         </div>
 
-        {/* Vertical divider */}
-        <div style={{ width: 1, backgroundColor: theme.div_line, margin: '0 10px', flexShrink: 0 }} />
+        <div className="cpu-divider" style={{ backgroundColor: theme.div_line }} />
 
-        {/* Right: big total % + per-core bars + temp */}
-        <div style={{ width: 260, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div className="cpu-side" style={{ width: cols * 270, maxWidth: '58%' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'space-between',
+              marginBottom: 8,
+            }}
+          >
             {total && (
               <div>
                 <span
                   style={{
-                    fontSize: 28,
+                    fontSize: 30,
                     fontWeight: 700,
                     lineHeight: 1,
                     color: gradAt(CPU_GRADIENT, total.usage / 100),
@@ -84,28 +87,33 @@ export default function CpuPanel({ cores, history, temperature, uptime, cpuModel
                 >
                   {total.usage.toFixed(0)}
                 </span>
-                <span style={{ fontSize: 12, color: theme.graph_text, marginLeft: 2 }}>%</span>
+                <span style={{ fontSize: 12, color: theme.graph_text, marginLeft: 3 }}>%</span>
               </div>
             )}
             {temperature && (
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: 22, fontWeight: 700, color: tempC, lineHeight: 1 }}>
+              <div>
+                <span style={{ fontSize: 22, fontWeight: 700, color: tempColor, lineHeight: 1 }}>
                   {temperature.cpu.toFixed(0)}
                 </span>
-                <span style={{ fontSize: 11, color: tempC, marginLeft: 2 }}>°C</span>
+                <span style={{ fontSize: 11, color: tempColor, marginLeft: 2 }}>°C</span>
               </div>
             )}
           </div>
 
-          {total && (
-            <UsageBar label="CPU" value={total.usage} gradient={CPU_GRADIENT} />
-          )}
+          {total && <UsageBar label="CPU" value={total.usage} gradient={CPU_GRADIENT} />}
 
-          <div style={{ marginTop: 4 }}>
-            {coreList.map(core => (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+              columnGap: 16,
+              marginTop: 4,
+            }}
+          >
+            {coreList.map((core, i) => (
               <UsageBar
                 key={core.name}
-                label={core.name.replace('cpu', 'Core')}
+                label={cols > 1 ? `C${i}` : `Core${i}`}
                 value={core.usage}
                 gradient={CPU_GRADIENT}
               />
