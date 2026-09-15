@@ -9,6 +9,8 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/host/root:ro,rslave
+      # Docker Engine API for the container panel (GET only; read-only is enough)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - PROC_PATH=/host/proc
       - SYS_PATH=/host/sys

@@ -12,6 +12,7 @@ const { getDiskInfo } = require('./readers/disk');
 const { getStorageInfo } = require('./readers/storage');
 const { getProcesses } = require('./readers/processes');
 const { getTemperatures } = require('./readers/temperature');
+const { getContainers, dockerAvailable } = require('./readers/docker');
 
 process.title = 'casaos-monitor';
 
@@ -21,10 +22,14 @@ const PORT = process.env.PORT || 3030;
 const MIN_INTERVAL = 100;
 const MAX_INTERVAL = 10000;
 const DEFAULT_INTERVAL = 1000;
+const IDLE_INTERVAL = 1000;      // sampling cadence with no clients (keeps history warm)
 // Per-process CPU% is derived from 10ms scheduler ticks, so windows shorter
 // than ~1s are pure noise. Storage needs a statfs() per mount and rarely changes.
 const PROCESS_INTERVAL = 1000;
 const STORAGE_INTERVAL = 5000;
+const DOCKER_INTERVAL = 2000;
+const HISTORY_STEP_MS = 1000;
+const HISTORY_SPAN_MS = 60 * 60 * 1000; // one hour of 1s points, sent on connect
 
 const app = express();
 const server = http.createServer(app);
@@ -86,43 +91,88 @@ const cpuModel = safe(getCpuModel, 'CPU');
 // One global sampler. Every delta-based reader (cpu, net, disk, processes)
 // keeps "previous" state, so it must be driven by exactly one clock; with a
 // timer per client two clients reading back-to-back produce zero-length
-// windows and bogus 0% readings.
+// windows and bogus 0% readings. The sampler keeps running at 1s with no
+// clients so the history buffer is complete when someone opens the page.
 // ---------------------------------------------------------------------------
 let processes = [];
 let processesAt = 0;
 let storage = [];
 let storageAt = 0;
+let docker = dockerAvailable() ? [] : null; // null = socket not mounted
+let dockerAt = 0;
+let dockerBusy = false;
 let lastSample = null;
 
-function sample() {
+const history = []; // { t, cpu, temp, rx, tx } at HISTORY_STEP_MS
+let historyAt = 0;
+
+if (docker === null) {
+  console.log('docker socket not found; container panel disabled (mount /var/run/docker.sock to enable)');
+}
+
+function refreshDocker() {
+  if (dockerBusy || docker === null) return;
+  dockerBusy = true;
+  getContainers()
+    .then(list => { if (list) docker = list; })
+    .catch(e => console.error('docker error:', e.message))
+    .finally(() => { dockerBusy = false; });
+}
+
+function sample(full) {
   const now = Date.now();
-  if (now - processesAt >= PROCESS_INTERVAL) {
-    processes = safe(getProcesses, processes);
-    processesAt = now;
+  if (full) {
+    if (now - processesAt >= PROCESS_INTERVAL) {
+      processes = safe(getProcesses, processes);
+      processesAt = now;
+    }
+    if (now - storageAt >= STORAGE_INTERVAL) {
+      storage = safe(getStorageInfo, storage);
+      storageAt = now;
+    }
+    if (now - dockerAt >= DOCKER_INTERVAL) {
+      dockerAt = now;
+      refreshDocker();
+    }
   }
-  if (now - storageAt >= STORAGE_INTERVAL) {
-    storage = safe(getStorageInfo, storage);
-    storageAt = now;
-  }
+
+  const cpu = safe(getCpuUsage, []);
+  const network = safe(getNetworkInfo, []);
+  const temperature = safe(getTemperatures, null);
+
   lastSample = {
+    type: 'metrics',
     timestamp: now,
     hostname,
     uptime: safe(getUptime, 'unknown'),
     cpuModel,
     loadAvg: safe(getLoadAvg, EMPTY_LOAD),
-    cpu: safe(getCpuUsage, []),
+    cpu,
     memory: safe(getMemoryInfo, EMPTY_MEMORY),
-    network: safe(getNetworkInfo, []),
+    network,
     disk: safe(getDiskInfo, []),
     storage,
-    temperature: safe(getTemperatures, null),
+    temperature,
     processes,
+    docker,
   };
+
+  if (now - historyAt >= HISTORY_STEP_MS) {
+    historyAt = now;
+    const total = cpu.find(c => c.name === 'cpu');
+    history.push({
+      t: now,
+      cpu: total ? total.usage : 0,
+      temp: temperature ? temperature.cpu : null,
+      rx: network[0] ? network[0].rxBytesPerSec : 0,
+      tx: network[0] ? network[0].txBytesPerSec : 0,
+    });
+    const cutoff = now - HISTORY_SPAN_MS;
+    while (history.length && history[0].t < cutoff) history.shift();
+  }
+
   return lastSample;
 }
-
-// Prime the delta readers so the first real sample has a baseline.
-sample();
 
 const clients = new Map(); // ws -> { intervalMs, lastSent }
 let timer = null;
@@ -135,7 +185,8 @@ function clampInterval(ms) {
 }
 
 function tick() {
-  const payload = JSON.stringify(sample());
+  const payload = JSON.stringify(sample(clients.size > 0));
+  if (clients.size === 0) return;
   const now = Date.now();
   for (const [ws, c] of clients) {
     if (ws.readyState !== ws.OPEN) continue;
@@ -149,19 +200,17 @@ function tick() {
 }
 
 function reschedule() {
-  let ms = Infinity;
+  let ms = IDLE_INTERVAL;
   for (const c of clients.values()) ms = Math.min(ms, c.intervalMs);
-  if (!Number.isFinite(ms)) {
-    clearInterval(timer);
-    timer = null;
-    timerMs = 0;
-    return;
-  }
   if (timer && ms === timerMs) return;
   clearInterval(timer);
   timerMs = ms;
   timer = setInterval(tick, ms);
 }
+
+// Prime the delta readers and start the idle sampler.
+sample(false);
+reschedule();
 
 wss.on('connection', (ws) => {
   const client = { intervalMs: DEFAULT_INTERVAL, lastSent: 0 };
@@ -169,9 +218,11 @@ wss.on('connection', (ws) => {
   console.log(`client connected (${clients.size} total)`);
   reschedule();
 
-  // First frame right away so the UI doesn't sit on "loading" for a full interval.
+  // History first so graphs are filled before the first live frame lands,
+  // then a frame right away so the UI doesn't sit on "loading".
+  ws.send(JSON.stringify({ type: 'history', stepMs: HISTORY_STEP_MS, points: history }));
   const fresh = lastSample && Date.now() - lastSample.timestamp < Math.max(timerMs, 1000);
-  ws.send(JSON.stringify(fresh ? lastSample : sample()));
+  ws.send(JSON.stringify(fresh ? lastSample : sample(true)));
   client.lastSent = Date.now();
 
   ws.on('message', (raw) => {

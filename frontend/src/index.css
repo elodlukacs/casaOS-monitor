@@ -15,7 +15,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── page layout: header / cpu / (mem | net | proc), fills the viewport ── */
+/* ── page layout: header / cpu / (mem | net+temp | docker+proc), fills the viewport ── */
 .app {
   height: 100%;
   display: flex;
@@ -49,8 +49,8 @@ body {
 .interval-btn:hover { color: #cccccc; border-color: #303030; }
 .interval-btn.active { color: #0de756; border-color: #3d7b46; }
 
-/* mem and net always show in full; proc takes the remaining height and
-   scrolls inside. The page itself only scrolls if mem/net outgrow it. */
+/* mem and net always show in full; the right column takes the remaining
+   height and scrolls inside. The page itself only scrolls if mem/net outgrow it. */
 .main-grid {
   flex: 1;
   min-height: 0;
@@ -63,8 +63,6 @@ body {
 /* ── panels ── */
 .panel { display: flex; flex-direction: column; }
 .panel-body { flex: 1; min-height: 0; padding: 14px 12px 10px; }
-.panel-proc { min-height: 0; }
-.panel-proc .panel-body { overflow: auto; }
 
 /* middle column: net on top (natural height), temp fills the rest */
 .mid-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
@@ -72,13 +70,20 @@ body {
 .mid-col .panel-temp { flex: 1 1 auto; min-height: 160px; }
 .panel-temp .panel-body { overflow: auto; }
 
+/* right column: docker (capped) on top, proc fills the rest; both scroll inside */
+.right-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.right-col .panel-docker { flex: 0 1 auto; min-height: 0; max-height: 45%; }
+.panel-docker .panel-body { overflow: auto; }
+.right-col .panel-proc { flex: 1 1 auto; min-height: 0; }
+.panel-proc .panel-body { overflow: auto; }
+
 /* ── cpu panel ── */
 .cpu-body { display: flex; gap: 14px; min-height: 170px; }
 .cpu-graph { flex: 1 1 0; min-width: 40%; min-height: 150px; display: flex; flex-direction: column; }
 .cpu-divider { width: 1px; flex-shrink: 0; }
 .cpu-side { flex: 0 1 auto; }
 
-/* ── process table ── */
+/* ── tables (proc, docker) ── */
 .proc-table { width: 100%; border-collapse: collapse; }
 .proc-table th {
   position: sticky;
@@ -98,7 +103,9 @@ body {
   .app { height: auto; min-height: 100%; }
   .main-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; }
   .mid-col { min-height: auto; }
-  .panel-proc { grid-column: 1 / -1; }
+  .right-col { grid-column: 1 / -1; min-height: auto; }
+  .right-col .panel-docker { max-height: none; }
+  .col-wide { display: none; }
 }
 @media (max-width: 760px) {
   .app { height: auto; min-height: 100%; }
@@ -107,7 +114,7 @@ body {
   .cpu-side { width: auto !important; max-width: none !important; }
   .main-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   .mid-col .panel-temp { flex: 0 0 auto; }
-  /* no height cap here: the page scrolls; the table can still scroll sideways */
+  /* no height cap here: the page scrolls; the tables can still scroll sideways */
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }

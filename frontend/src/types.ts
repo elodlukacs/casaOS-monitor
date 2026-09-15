@@ -29,6 +29,7 @@ export interface DiskInfo {
   device: string;
   readBytesPerSec: number;
   writeBytesPerSec: number;
+  busyPercent?: number; // share of time with I/O in flight
 }
 
 export interface StorageInfo {
@@ -52,6 +53,22 @@ export interface Process {
   cpuPercent: number;
   memBytes: number;
   state: string;
+  readBytesPerSec?: number;
+  writeBytesPerSec?: number;
+}
+
+export interface DockerContainer {
+  id: string;
+  name: string;
+  image: string;
+  state: string;   // running | exited | paused | restarting | dead | created
+  status: string;  // docker's human text, e.g. "Up 3 days (healthy)"
+  cpuPercent: number;
+  memUsage: number;
+  memLimit: number;
+  memPercent: number;
+  rxBytesPerSec: number;
+  txBytesPerSec: number;
 }
 
 export interface LoadAvg {
@@ -61,6 +78,7 @@ export interface LoadAvg {
 }
 
 export interface Metrics {
+  type?: 'metrics';
   timestamp: number;
   hostname: string;
   uptime: string;
@@ -73,4 +91,27 @@ export interface Metrics {
   storage: StorageInfo[];
   temperature: TemperatureInfo | null;
   processes: Process[];
+  docker?: DockerContainer[] | null; // null: docker socket not mounted
+}
+
+export interface HistoryPoint {
+  t: number;
+  cpu: number;
+  temp: number | null;
+  rx: number;
+  tx: number;
+}
+
+export interface HistoryMessage {
+  type: 'history';
+  stepMs: number;
+  points: HistoryPoint[];
+}
+
+export type ServerMessage = Metrics | HistoryMessage;
+
+// one graph sample: epoch ms + value
+export interface Point {
+  t: number;
+  v: number;
 }

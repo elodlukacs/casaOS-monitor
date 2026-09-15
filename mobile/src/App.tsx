@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Metrics } from './types';
+import type { Metrics, ServerMessage } from './types';
 import Dashboard from './Dashboard';
 
 const STORAGE_KEY = 'casaos_ws_host';
@@ -92,9 +92,16 @@ export default function App() {
     };
 
     ws.onmessage = e => {
-      const data = JSON.parse(e.data) as Metrics;
+      const msg = JSON.parse(e.data) as ServerMessage;
       lastFrameRef.current = Date.now();
       wasLiveRef.current = true;
+      if (msg.type === 'history') {
+        // server sends the last hour at 1s on connect; we poll at 1s too,
+        // so the tail of it is exactly the graph we would have built
+        setCpuHistory(msg.points.slice(-HISTORY).map(p => p.cpu));
+        return;
+      }
+      const data: Metrics = msg;
       setMetrics(data);
       const total = data.cpu.find(c => c.name === 'cpu');
       if (total) setCpuHistory(h => [...h.slice(-(HISTORY - 1)), total.usage]);

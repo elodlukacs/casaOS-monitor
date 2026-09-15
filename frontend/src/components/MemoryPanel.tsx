@@ -2,6 +2,7 @@ import type { MemoryInfo, DiskInfo, StorageInfo } from '../types';
 import Panel from './Panel';
 import UsageBar from './UsageBar';
 import { theme } from '../theme';
+import { THRESHOLDS, level, levelColor } from '../thresholds';
 
 function fmtBytes(bytes: number) {
   if (bytes >= 1099511627776) return (bytes / 1099511627776).toFixed(1) + 'T';
@@ -52,6 +53,8 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
   const pct = (v: number) => (memory.total > 0 ? (v / memory.total) * 100 : 0);
   // older backends sent MemAvailable as `free`; fall back so nothing shows 0
   const available = memory.available ?? memory.free;
+  const usedColor = levelColor(level(memory.usedPercent, THRESHOLDS.memUsed));
+  const swapColor = levelColor(level(memory.swap.usedPercent, THRESHOLDS.swapUsed));
 
   const drives = (storage ?? []).filter(s => s.total > MIN_MOUNT_SIZE);
   const ioByDisk = new Map<string, DiskInfo>();
@@ -69,7 +72,7 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
         </>
       }
     >
-      <UsageBar label="Used"      value={memory.usedPercent} total={fmtBytes(memory.used)}   gradient={USED}   labelWidth={72} />
+      <UsageBar label="Used"      value={memory.usedPercent} total={fmtBytes(memory.used)}   gradient={USED}   labelWidth={72} valueColor={usedColor} />
       <UsageBar label="Available" value={pct(available)}     total={fmtBytes(available)}     gradient={AVAIL}  labelWidth={72} />
       <UsageBar label="Cached"    value={pct(memory.cached)} total={fmtBytes(memory.cached)} gradient={CACHED} labelWidth={72} />
       <UsageBar label="Free"      value={pct(memory.free)}   total={fmtBytes(memory.free)}   gradient={FREE}   labelWidth={72} />
@@ -77,7 +80,7 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
       {memory.swap.total > 0 && (
         <>
           <SectionLabel>─ swap ─</SectionLabel>
-          <UsageBar label="Swap" value={memory.swap.usedPercent} total={fmtBytes(memory.swap.used)} gradient={USED} labelWidth={72} />
+          <UsageBar label="Swap" value={memory.swap.usedPercent} total={fmtBytes(memory.swap.used)} gradient={USED} labelWidth={72} valueColor={swapColor} />
         </>
       )}
 
@@ -87,7 +90,10 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {drives.map(d => {
               const io = ioByDisk.get(parentDisk(d.device) ?? '');
-              const busy = io !== undefined && (io.readBytesPerSec > 0 || io.writeBytesPerSec > 0);
+              const busy = io?.busyPercent ?? 0;
+              const active = io !== undefined && (io.readBytesPerSec > 0 || io.writeBytesPerSec > 0 || busy > 0);
+              const fullColor = levelColor(level(d.usedPercent, THRESHOLDS.diskUsage));
+              const busyColor = levelColor(level(busy, THRESHOLDS.diskBusy));
               return (
                 <div key={d.mountpoint}>
                   <div
@@ -104,22 +110,34 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
                       style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                       title={d.mountpoint}
                     >
-                      <span style={{ color: theme.fg }}>{d.label}</span>
+                      <span style={{ color: fullColor ?? theme.fg, fontWeight: fullColor ? 700 : 400 }}>{d.label}</span>
                       {d.mountpoint !== '/' && d.label !== d.mountpoint && (
                         <span style={{ color: theme.graph_text }}> {d.mountpoint}</span>
                       )}
                     </span>
-                    <span style={{ color: theme.hi_fg, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {busy && (
-                        <>
-                          <span style={{ color: theme.cached_mid }}>↓{fmtSpeed(io.readBytesPerSec)}</span>{' '}
-                          <span style={{ color: theme.used_mid }}>↑{fmtSpeed(io.writeBytesPerSec)}</span>{'   '}
-                        </>
-                      )}
+                    <span style={{ color: fullColor ?? theme.hi_fg, whiteSpace: 'nowrap', flexShrink: 0 }}>
                       {fmtBytes(d.used)}<span style={{ color: theme.inactive_fg }}>/</span>{fmtBytes(d.total)}
                     </span>
                   </div>
-                  <UsageBar value={d.usedPercent} gradient={USED} />
+                  <UsageBar value={d.usedPercent} gradient={USED} valueColor={fullColor} />
+                  {active && io && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: 10,
+                        fontSize: 10,
+                        lineHeight: '13px',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span style={{ color: theme.cached_mid }}>↓{fmtSpeed(io.readBytesPerSec)}</span>
+                      <span style={{ color: theme.used_mid }}>↑{fmtSpeed(io.writeBytesPerSec)}</span>
+                      <span style={{ color: theme.graph_text }}>
+                        busy <span style={{ color: busyColor ?? theme.fg, fontWeight: busyColor ? 700 : 400 }}>{busy.toFixed(0)}%</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
