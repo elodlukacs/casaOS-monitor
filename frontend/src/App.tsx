@@ -261,6 +261,7 @@ export default function App() {
 
       <CpuPanel
         cores={metrics.cpu}
+        freq={metrics.cpuFreq ?? null}
         history={history.cpu}
         windowMs={windowMs}
         uptime={metrics.uptime}
@@ -272,7 +273,7 @@ export default function App() {
         <MemoryPanel memory={metrics.memory} disk={metrics.disk} storage={metrics.storage ?? []} />
         <div className="mid-col">
           <NetworkPanel network={metrics.network} rxHistory={history.rx} txHistory={history.tx} windowMs={windowMs} />
-          <TempPanel temperature={metrics.temperature} history={history.temp} windowMs={windowMs} />
+          <TempPanel temperature={metrics.temperature} cooling={metrics.cooling ?? null} history={history.temp} windowMs={windowMs} />
         </div>
         <div className="right-col">
           {metrics.docker !== undefined && <DockerPanel containers={metrics.docker} />}

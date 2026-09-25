@@ -71,6 +71,21 @@ export interface DockerContainer {
   txBytesPerSec: number;
 }
 
+export interface CpuFreq {
+  cores: (number | null)[]; // MHz, index = logical cpu number (cpuN)
+  avg: number;              // MHz, mean of cores with a reading
+  min: number | null;       // MHz, hardware range
+  max: number | null;
+  base: number | null;      // MHz, Intel HWP only; below it under load = throttling
+  governor: string | null;  // e.g. powersave, performance, schedutil
+}
+
+export interface Cooling {
+  fans: { label: string; rpm: number }[];
+  // software fan control channels the board exposes (pwmY); read-only here
+  controls: { label: string; percent: number | null; mode: 'full' | 'manual' | 'auto' | null }[];
+}
+
 export interface LoadAvg {
   one: number;
   five: number;
@@ -85,11 +100,13 @@ export interface Metrics {
   cpuModel: string;
   loadAvg: LoadAvg;
   cpu: CpuCore[];
+  cpuFreq?: CpuFreq | null;
   memory: MemoryInfo;
   network: NetworkInterface[];
   disk: DiskInfo[];
   storage: StorageInfo[];
   temperature: TemperatureInfo | null;
+  cooling?: Cooling | null;
   processes: Process[];
   docker?: DockerContainer[] | null; // null: docker socket not mounted
 }

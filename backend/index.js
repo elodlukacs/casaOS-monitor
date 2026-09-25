@@ -13,6 +13,8 @@ const { getStorageInfo } = require('./readers/storage');
 const { getProcesses } = require('./readers/processes');
 const { getTemperatures } = require('./readers/temperature');
 const { getContainers, dockerAvailable } = require('./readers/docker');
+const { getCpuFreq } = require('./readers/cpufreq');
+const { getCooling } = require('./readers/cooling');
 
 process.title = 'casaos-monitor';
 
@@ -28,6 +30,7 @@ const IDLE_INTERVAL = 1000;      // sampling cadence with no clients (keeps hist
 const PROCESS_INTERVAL = 1000;
 const STORAGE_INTERVAL = 5000;
 const DOCKER_INTERVAL = 2000;
+const COOLING_INTERVAL = 1000;   // fan RPM moves slowly; no need to walk hwmon at 10Hz
 const HISTORY_STEP_MS = 1000;
 const HISTORY_SPAN_MS = 60 * 60 * 1000; // one hour of 1s points, sent on connect
 
@@ -101,6 +104,8 @@ let storageAt = 0;
 let docker = dockerAvailable() ? [] : null; // null = socket not mounted
 let dockerAt = 0;
 let dockerBusy = false;
+let cooling = null;
+let coolingAt = 0;
 let lastSample = null;
 
 const history = []; // { t, cpu, temp, rx, tx } at HISTORY_STEP_MS
@@ -134,6 +139,10 @@ function sample(full) {
       dockerAt = now;
       refreshDocker();
     }
+    if (now - coolingAt >= COOLING_INTERVAL) {
+      cooling = safe(getCooling, cooling);
+      coolingAt = now;
+    }
   }
 
   const cpu = safe(getCpuUsage, []);
@@ -148,11 +157,13 @@ function sample(full) {
     cpuModel,
     loadAvg: safe(getLoadAvg, EMPTY_LOAD),
     cpu,
+    cpuFreq: safe(getCpuFreq, null),
     memory: safe(getMemoryInfo, EMPTY_MEMORY),
     network,
     disk: safe(getDiskInfo, []),
     storage,
     temperature,
+    cooling,
     processes,
     docker,
   };
