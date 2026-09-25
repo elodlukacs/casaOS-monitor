@@ -41,6 +41,9 @@ const FREE: [string, string, string] = [theme.free_start, theme.free_mid, theme.
 
 const MIN_MOUNT_SIZE = 1024 * 1024 * 1024;
 
+// Widest fmtSpeed output plus the arrow is 9 characters ("↓123.4M/s").
+const ioField: React.CSSProperties = { display: 'inline-block', minWidth: '9ch', textAlign: 'right' };
+
 function SectionLabel({ children }: { children: string }) {
   return (
     <div style={{ fontSize: 10, color: theme.graph_text, margin: '10px 0 4px', letterSpacing: '0.08em' }}>
@@ -91,7 +94,6 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
             {drives.map(d => {
               const io = ioByDisk.get(parentDisk(d.device) ?? '');
               const busy = io?.busyPercent ?? 0;
-              const active = io !== undefined && (io.readBytesPerSec > 0 || io.writeBytesPerSec > 0 || busy > 0);
               const fullColor = levelColor(level(d.usedPercent, THRESHOLDS.diskUsage));
               const busyColor = levelColor(level(busy, THRESHOLDS.diskBusy));
               return (
@@ -120,7 +122,11 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
                     </span>
                   </div>
                   <UsageBar value={d.usedPercent} gradient={USED} valueColor={fullColor} />
-                  {active && io && (
+                  {/* Always rendered when the disk has I/O data: hiding it on
+                      idle samples made every row below jump up and down.
+                      Idle values are dimmed instead, and each field has a
+                      fixed width so changing digits don't shift the row. */}
+                  {io && (
                     <div
                       style={{
                         display: 'flex',
@@ -131,10 +137,25 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      <span style={{ color: theme.cached_mid }}>↓{fmtSpeed(io.readBytesPerSec)}</span>
-                      <span style={{ color: theme.used_mid }}>↑{fmtSpeed(io.writeBytesPerSec)}</span>
+                      <span style={{ ...ioField, color: io.readBytesPerSec > 0 ? theme.cached_mid : theme.graph_text }}>
+                        ↓{fmtSpeed(io.readBytesPerSec)}
+                      </span>
+                      <span style={{ ...ioField, color: io.writeBytesPerSec > 0 ? theme.used_mid : theme.graph_text }}>
+                        ↑{fmtSpeed(io.writeBytesPerSec)}
+                      </span>
                       <span style={{ color: theme.graph_text }}>
-                        busy <span style={{ color: busyColor ?? theme.fg, fontWeight: busyColor ? 700 : 400 }}>{busy.toFixed(0)}%</span>
+                        busy{' '}
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            minWidth: '4ch',
+                            textAlign: 'right',
+                            color: busyColor ?? (busy > 0 ? theme.fg : theme.graph_text),
+                            fontWeight: busyColor ? 700 : 400,
+                          }}
+                        >
+                          {busy.toFixed(0)}%
+                        </span>
                       </span>
                     </div>
                   )}
