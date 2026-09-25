@@ -27,10 +27,31 @@ const TRIM_EVERY = 1024;   // stale points are cut in batches, not one per sampl
 const INTERVAL_KEY = 'monitor.intervalMs';
 const WINDOW_KEY = 'monitor.windowMs';
 const IFACE_KEY = 'monitor.netIface';
+const TOKEN_KEY = 'monitor.token';
 const RECONNECT_MS = 2000;
-const WS_URL = import.meta.env.DEV
-  ? 'ws://localhost:3030'
-  : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+
+// MONITOR_TOKEN on the server: open the page once as /?token=<value>. The
+// token is remembered in this browser and removed from the address bar so it
+// doesn't end up in bookmarks or screenshots. /?token= (empty) forgets it.
+function takeToken(): string | null {
+  try {
+    const url = new URL(location.href);
+    const t = url.searchParams.get('token');
+    if (t !== null) {
+      if (t) localStorage.setItem(TOKEN_KEY, t);
+      else localStorage.removeItem(TOKEN_KEY);
+      url.searchParams.delete('token');
+      history.replaceState(null, '', url.toString());
+    }
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+const TOKEN = takeToken();
+const WS_URL =
+  (import.meta.env.DEV ? 'ws://localhost:3030' : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`) +
+  (TOKEN ? `/?token=${encodeURIComponent(TOKEN)}` : '');
 
 // Graph series live in a ref and are appended in place; copying four arrays
 // of up to 36k points on every 100ms frame was most of the page's work.
@@ -106,6 +127,7 @@ function Clock() {
 export default function App() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [connected, setConnected] = useState(false);
+  const [failedConnects, setFailedConnects] = useState(0); // before the first frame
   const [intervalMs, setIntervalMs] = useState(() => loadChoice(INTERVAL_KEY, INTERVALS, DEFAULT_INTERVAL));
   const [windowMs, setWindowMs] = useState(() => loadChoice(WINDOW_KEY, WINDOWS.map(w => w.ms), DEFAULT_WINDOW));
   const [netIface, setNetIface] = useState<string | null>(() => loadString(IFACE_KEY));
@@ -131,10 +153,13 @@ export default function App() {
       if (disposed) return;
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
+      let opened = false;
 
       ws.onopen = () => {
         if (disposed) return;
+        opened = true;
         setConnected(true);
+        setFailedConnects(0);
         sendInterval(ws);
         ws.send(JSON.stringify({ type: 'getHistory' }));
       };
@@ -177,6 +202,8 @@ export default function App() {
       ws.onclose = () => {
         if (disposed) return;
         setConnected(false);
+        // The browser hides why a handshake failed (401/403 look like a dead server).
+        if (!opened) setFailedConnects(n => n + 1);
         reconnect = window.setTimeout(connect, RECONNECT_MS);
       };
     }
@@ -233,7 +260,16 @@ export default function App() {
           letterSpacing: '0.1em',
         }}
       >
-        {connected ? 'loading…' : 'connecting…'}
+        <div style={{ textAlign: 'center', lineHeight: '20px' }}>
+          {connected ? 'loading…' : 'connecting…'}
+          {!connected && failedConnects >= 3 && (
+            <div style={{ fontSize: 11, letterSpacing: 0, marginTop: 8 }}>
+              the server is not answering or refused the connection
+              <br />
+              if MONITOR_TOKEN is set on the server, open this page as /?token=&lt;value&gt;
+            </div>
+          )}
+        </div>
       </div>
     );
   }

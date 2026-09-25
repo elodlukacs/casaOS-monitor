@@ -69,8 +69,9 @@ export default function DockerPanel({ containers }: Props) {
     >
       {!containers ? (
         <div style={{ color: theme.graph_text, fontSize: 11, lineHeight: '16px' }}>
-          docker socket not mounted<br />
-          add <span style={{ color: theme.fg }}>/var/run/docker.sock:/var/run/docker.sock:ro</span> to the compose volumes
+          docker API not reachable<br />
+          check that the <span style={{ color: theme.fg }}>casaos-monitor-docker-proxy</span> container is running
+          and <span style={{ color: theme.fg }}>DOCKER_HOST</span> is set (see docker-compose.yml)
         </div>
       ) : containers.length === 0 ? (
         <div style={{ color: theme.graph_text, fontSize: 11 }}>no containers</div>

@@ -15,6 +15,7 @@ const { getTemperatures } = require('./readers/temperature');
 const { getContainers, dockerAvailable } = require('./readers/docker');
 const { getCpuFreq } = require('./readers/cpufreq');
 const { getCooling } = require('./readers/cooling');
+const { verifyClient, tokenRequired } = require('./access');
 
 process.title = 'casaos-monitor';
 
@@ -45,7 +46,14 @@ const HISTORY_SPAN_MS = 60 * 60 * 1000; // one hour of 1s points, sent on connec
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+// Clients only send tiny control messages; ws would accept up to 100 MiB.
+const wss = new WebSocketServer({ server, maxPayload: 64 * 1024, verifyClient });
+
+// For the Docker HEALTHCHECK: healthy while the sampler keeps producing frames.
+app.get('/healthz', (req, res) => {
+  const age = lastSample ? Date.now() - lastSample.timestamp : Infinity;
+  res.status(age < 10000 ? 200 : 503).json({ ok: age < 10000, ageMs: Number.isFinite(age) ? age : null });
+});
 
 const frontendPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendPath)) {
@@ -110,7 +118,9 @@ let processes = [];
 let processesAt = 0;
 let storage = [];
 let storageAt = 0;
-let docker = dockerAvailable() ? [] : null; // null = socket not mounted
+const dockerConfigured = dockerAvailable();
+let docker = dockerConfigured ? [] : null; // null = no Docker API configured or reachable
+let dockerError = null; // last error text, logged once per change
 let dockerAt = 0;
 let dockerBusy = false;
 let cooling = null;
@@ -122,16 +132,27 @@ let lastSample = null;
 const history = []; // { t, cpu, temp, rx, tx } at HISTORY_STEP_MS
 let historyAt = 0;
 
-if (docker === null) {
-  console.log('docker socket not found; container panel disabled (mount /var/run/docker.sock to enable)');
+if (!dockerConfigured) {
+  console.log('no Docker API configured; container panel disabled (set DOCKER_HOST, see docker-compose.yml)');
 }
 
 function refreshDocker() {
-  if (dockerBusy || docker === null) return;
+  if (dockerBusy || !dockerConfigured) return;
   dockerBusy = true;
   getContainers()
-    .then(list => { if (list) docker = list; })
-    .catch(e => console.error('docker error:', e.message))
+    .then(list => {
+      if (!list) return;
+      docker = list;
+      if (dockerError) console.log('docker API reachable again');
+      dockerError = null;
+    })
+    .catch(e => {
+      // Unreachable (proxy down, wrong DOCKER_HOST): report null so the panel
+      // says so instead of showing an empty list. Keeps retrying.
+      docker = null;
+      if (e.message !== dockerError) console.error('docker error:', e.message);
+      dockerError = e.message;
+    })
     .finally(() => { dockerBusy = false; });
 }
 
@@ -287,4 +308,5 @@ wss.on('connection', (ws) => {
 
 server.listen(PORT, () => {
   console.log(`casaos-monitor on :${PORT}  proc=${PROC_PATH}`);
+  if (tokenRequired) console.log('MONITOR_TOKEN set: clients must connect with ?token=… (the mobile app cannot)');
 });
