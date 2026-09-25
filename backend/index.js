@@ -15,6 +15,7 @@ const { getTemperatures } = require('./readers/temperature');
 const { getContainers, dockerAvailable } = require('./readers/docker');
 const { getCpuFreq } = require('./readers/cpufreq');
 const { getCooling } = require('./readers/cooling');
+const { verifyClient, tokenRequired } = require('./access');
 
 process.title = 'casaos-monitor';
 
@@ -31,12 +32,28 @@ const PROCESS_INTERVAL = 1000;
 const STORAGE_INTERVAL = 5000;
 const DOCKER_INTERVAL = 2000;
 const COOLING_INTERVAL = 1000;   // fan RPM moves slowly; no need to walk hwmon at 10Hz
+// Some sensors are read by sending the device a command (nvme, iwlwifi,
+// drivetemp on SATA disks); once a second is plenty and spares the hardware.
+const TEMP_INTERVAL = 1000;
+// Ping every client this often; one that hasn't answered the previous ping
+// (a phone that went to sleep, a dropped Wi-Fi link) is dropped.
+const HEARTBEAT_MS = 15000;
+// Skip frames for a client whose unsent backlog is over this, instead of
+// queueing without bound for one that stopped reading.
+const MAX_BUFFERED = 1024 * 1024;
 const HISTORY_STEP_MS = 1000;
 const HISTORY_SPAN_MS = 60 * 60 * 1000; // one hour of 1s points, sent on connect
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+// Clients only send tiny control messages; ws would accept up to 100 MiB.
+const wss = new WebSocketServer({ server, maxPayload: 64 * 1024, verifyClient });
+
+// For the Docker HEALTHCHECK: healthy while the sampler keeps producing frames.
+app.get('/healthz', (req, res) => {
+  const age = lastSample ? Date.now() - lastSample.timestamp : Infinity;
+  res.status(age < 10000 ? 200 : 503).json({ ok: age < 10000, ageMs: Number.isFinite(age) ? age : null });
+});
 
 const frontendPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendPath)) {
@@ -101,26 +118,41 @@ let processes = [];
 let processesAt = 0;
 let storage = [];
 let storageAt = 0;
-let docker = dockerAvailable() ? [] : null; // null = socket not mounted
+const dockerConfigured = dockerAvailable();
+let docker = dockerConfigured ? [] : null; // null = no Docker API configured or reachable
+let dockerError = null; // last error text, logged once per change
 let dockerAt = 0;
 let dockerBusy = false;
 let cooling = null;
 let coolingAt = 0;
+let temperature = null;
+let temperatureAt = 0;
 let lastSample = null;
 
 const history = []; // { t, cpu, temp, rx, tx } at HISTORY_STEP_MS
 let historyAt = 0;
 
-if (docker === null) {
-  console.log('docker socket not found; container panel disabled (mount /var/run/docker.sock to enable)');
+if (!dockerConfigured) {
+  console.log('no Docker API configured; container panel disabled (set DOCKER_HOST, see docker-compose.yml)');
 }
 
 function refreshDocker() {
-  if (dockerBusy || docker === null) return;
+  if (dockerBusy || !dockerConfigured) return;
   dockerBusy = true;
   getContainers()
-    .then(list => { if (list) docker = list; })
-    .catch(e => console.error('docker error:', e.message))
+    .then(list => {
+      if (!list) return;
+      docker = list;
+      if (dockerError) console.log('docker API reachable again');
+      dockerError = null;
+    })
+    .catch(e => {
+      // Unreachable (proxy down, wrong DOCKER_HOST): report null so the panel
+      // says so instead of showing an empty list. Keeps retrying.
+      docker = null;
+      if (e.message !== dockerError) console.error('docker error:', e.message);
+      dockerError = e.message;
+    })
     .finally(() => { dockerBusy = false; });
 }
 
@@ -147,7 +179,10 @@ function sample(full) {
 
   const cpu = safe(getCpuUsage, []);
   const network = safe(getNetworkInfo, []);
-  const temperature = safe(getTemperatures, null);
+  if (now - temperatureAt >= TEMP_INTERVAL) {
+    temperature = safe(getTemperatures, temperature);
+    temperatureAt = now;
+  }
 
   lastSample = {
     type: 'metrics',
@@ -200,7 +235,7 @@ function tick() {
   if (clients.size === 0) return;
   const now = Date.now();
   for (const [ws, c] of clients) {
-    if (ws.readyState !== ws.OPEN) continue;
+    if (ws.readyState !== ws.OPEN || ws.bufferedAmount > MAX_BUFFERED) continue;
     // Send when this client's own interval has elapsed (with half-tick slack
     // so timer jitter doesn't skip a beat).
     if (now - c.lastSent >= c.intervalMs - timerMs / 2) {
@@ -223,8 +258,21 @@ function reschedule() {
 sample(false);
 reschedule();
 
+// Browsers and the Android WebView answer pings on their own; no client code needed.
+setInterval(() => {
+  for (const [ws, c] of clients) {
+    if (!c.alive) {
+      ws.terminate(); // fires 'close', which removes it
+      continue;
+    }
+    c.alive = false;
+    ws.ping();
+  }
+}, HEARTBEAT_MS);
+
 wss.on('connection', (ws) => {
-  const client = { intervalMs: DEFAULT_INTERVAL, lastSent: 0 };
+  const client = { intervalMs: DEFAULT_INTERVAL, lastSent: 0, alive: true };
+  ws.on('pong', () => { client.alive = true; });
   clients.set(ws, client);
   console.log(`client connected (${clients.size} total)`);
   reschedule();
@@ -243,7 +291,9 @@ wss.on('connection', (ws) => {
       } else if (msg.type === 'getHistory') {
         // Opt-in: clients that only understand metrics frames (the mobile
         // app) never see this message.
-        ws.send(JSON.stringify({ type: 'history', stepMs: HISTORY_STEP_MS, points: history }));
+        // rx/tx in the points belong to the main interface (network[0]).
+        const iface = lastSample && lastSample.network[0] ? lastSample.network[0].iface : null;
+        ws.send(JSON.stringify({ type: 'history', stepMs: HISTORY_STEP_MS, iface, points: history }));
       }
     } catch {}
   });
@@ -258,4 +308,5 @@ wss.on('connection', (ws) => {
 
 server.listen(PORT, () => {
   console.log(`casaos-monitor on :${PORT}  proc=${PROC_PATH}`);
+  if (tokenRequired) console.log('MONITOR_TOKEN set: clients must connect with ?token=… (the mobile app cannot)');
 });
