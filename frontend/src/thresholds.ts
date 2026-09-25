@@ -11,12 +11,18 @@ interface Threshold {
 // Where things turn yellow / red. Percentages unless noted.
 export const THRESHOLDS = {
   cpuTemp: { warn: 70, crit: 80 },   // °C
-  sensorTemp: { warn: 75, crit: 85 }, // °C, other sensors (nvme, drives...)
+  sensorTemp: { warn: 75, crit: 85 }, // °C, other sensors (nvme, chipset...)
+  hddTemp: { warn: 50, crit: 55 },    // °C, SATA drives (drivetemp); spinning disks age fast above ~50
   diskUsage: { warn: 80, crit: 90 },
   memUsed: { warn: 85, crit: 95 },
   swapUsed: { warn: 50, crit: 80 },
   diskBusy: { warn: 80, crit: 95 },
 } satisfies Record<string, Threshold>;
+
+// Thresholds for one entry of temperature.all, by its "chip/label" name.
+export function sensorThreshold(label: string): Threshold {
+  return label.startsWith('drivetemp/') ? THRESHOLDS.hddTemp : THRESHOLDS.sensorTemp;
+}
 
 export function level(value: number, th: Threshold): Level {
   if (value >= th.crit) return 'crit';
@@ -51,7 +57,7 @@ export function collectAlerts(m: Metrics): Alert[] {
   if (m.temperature) {
     add(level(m.temperature.cpu, THRESHOLDS.cpuTemp), `cpu ${m.temperature.cpu.toFixed(0)}°C`);
     for (const s of m.temperature.all) {
-      const l = level(s.celsius, THRESHOLDS.sensorTemp);
+      const l = level(s.celsius, sensorThreshold(s.label));
       if (l === 'crit') add(l, `${s.label} ${s.celsius.toFixed(0)}°C`);
     }
   }

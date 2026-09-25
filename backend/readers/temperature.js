@@ -3,8 +3,9 @@ const path = require('path');
 
 const SYS_PATH = process.env.SYS_PATH || '/sys';
 
-// preferred zone type keywords, in priority order
-const CPU_KEYWORDS = ['pkg', 'cpu', 'core', 'x86', 'soc', 'acpi'];
+// preferred CPU sensor keywords, in priority order (Intel coretemp package,
+// AMD k10temp Tctl/Tdie, then generic names)
+const CPU_KEYWORDS = ['package id', 'tctl', 'tdie', 'pkg', 'cpu', 'core', 'x86', 'soc', 'acpi'];
 
 function readMilliC(filePath) {
   try {
@@ -48,6 +49,8 @@ function getHwmonTemps() {
     // find all temp*_input files
     let files;
     try { files = fs.readdirSync(dir); } catch { continue; }
+    // temp2 before temp10, the order `sensors` prints
+    files.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     for (const file of files) {
       if (!/^temp\d+_input$/.test(file)) continue;
       const milliC = readMilliC(path.join(dir, file));
@@ -61,7 +64,15 @@ function getHwmonTemps() {
 }
 
 function getTemperatures() {
-  const all = [...getThermalZones(), ...getHwmonTemps()];
+  const hwmon = getHwmonTemps();
+  // Drop thermal zones that are the same sensor as an hwmon entry: a zone
+  // registers an hwmon device under its own name (acpitz → acpitz/acpitz), and
+  // x86_pkg_temp reads the same register as coretemp's "Package id N".
+  const chips = new Set(hwmon.map(t => t.label.split('/')[0]));
+  const zones = getThermalZones().filter(
+    z => !chips.has(z.label) && !(z.label === 'x86_pkg_temp' && chips.has('coretemp')),
+  );
+  const all = [...zones, ...hwmon];
   if (all.length === 0) return null;
 
   // pick best CPU temp by keyword priority

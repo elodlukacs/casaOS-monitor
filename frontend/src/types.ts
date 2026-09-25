@@ -176,6 +176,7 @@ export interface HistoryPoint {
 export interface HistoryMessage {
   type: 'history';
   stepMs: number;
+  iface?: string | null; // interface the rx/tx points belong to
   points: HistoryPoint[];
 }
 
