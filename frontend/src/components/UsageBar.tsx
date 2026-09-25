@@ -63,6 +63,10 @@ export default function UsageBar({
             background: gradient
               ? `linear-gradient(90deg, ${gradient[0]} 0%, ${gradient[1]} 50%, ${gradient[2]} 100%)`
               : fill,
+            // Size the gradient to the whole track, not the filled part, so
+            // the colour at the tip matches the value: a 20% bar stays green
+            // and only a nearly full one reaches red.
+            backgroundSize: gradient && pct > 0 ? `${10000 / pct}% 100%` : undefined,
             transition: 'width 0.15s ease',
           }}
         />

@@ -41,10 +41,19 @@ function niceMax(raw: number) {
 const DL: [string, string, string] = [theme.download_start, theme.download_mid, theme.download_end];
 const UL: [string, string, string] = [theme.upload_start, theme.upload_mid, theme.upload_end];
 
+export interface NetSeries {
+  rx: Point[];
+  tx: Point[];
+}
+
+const EMPTY: NetSeries = { rx: [], tx: [] };
+
 interface Props {
   network: NetworkInterface[];
-  rxHistory: Point[];
-  txHistory: Point[];
+  shown: NetworkInterface | undefined;  // interface graphed at the top
+  primary: string | undefined;          // the server's main interface (default route)
+  history: NetSeries | undefined;       // graph samples for `shown`
+  onPick: (iface: string) => void;
   windowMs: number;
 }
 
@@ -85,16 +94,22 @@ function Row({ arrow, label, color, value, history, windowMs, gradient }: RowPro
   );
 }
 
-export default function NetworkPanel({ network, rxHistory, txHistory, windowMs }: Props) {
-  const main = network[0];
-  const others = network.slice(1);
+export default function NetworkPanel({ network, shown, primary, history = EMPTY, onPick, windowMs }: Props) {
+  const main = shown;
+  const others = network.filter(n => n !== shown);
 
   return (
-    <Panel title="net" num="3" className="panel-net" borderColor={theme.net_box} extra={main ? main.iface : undefined}>
+    <Panel
+      title="net"
+      num="3"
+      className="panel-net"
+      borderColor={theme.net_box}
+      extra={main ? main.iface + (main.iface === primary ? '' : ' (picked)') : undefined}
+    >
       {main ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Row arrow="▼" label="Download" color={theme.download_end} value={main.rxBytesPerSec} history={rxHistory} windowMs={windowMs} gradient={DL} />
-          <Row arrow="▲" label="Upload" color={theme.upload_end} value={main.txBytesPerSec} history={txHistory} windowMs={windowMs} gradient={UL} />
+          <Row arrow="▼" label="Download" color={theme.download_end} value={main.rxBytesPerSec} history={history.rx} windowMs={windowMs} gradient={DL} />
+          <Row arrow="▲" label="Upload" color={theme.upload_end} value={main.txBytesPerSec} history={history.tx} windowMs={windowMs} gradient={UL} />
         </div>
       ) : (
         <div style={{ color: theme.graph_text, fontSize: 11 }}>no interfaces</div>
@@ -103,19 +118,23 @@ export default function NetworkPanel({ network, rxHistory, txHistory, windowMs }
       {others.length > 0 && (
         <div style={{ marginTop: 12, paddingTop: 8, borderTop: `1px solid ${theme.div_line}` }}>
           {others.map(iface => (
-            <div
+            <button
               key={iface.iface}
-              style={{ fontSize: 11, display: 'flex', justifyContent: 'space-between', gap: 8, lineHeight: '16px' }}
+              type="button"
+              className="net-row"
+              onClick={() => onPick(iface.iface)}
+              title={`graph ${iface.iface}` + (iface.iface === primary ? ' (main interface)' : '')}
             >
               <span style={{ color: theme.graph_text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {iface.iface}
+                {iface.iface === primary && <span style={{ color: theme.inactive_fg }}> main</span>}
               </span>
               <span style={{ whiteSpace: 'nowrap' }}>
                 <span style={{ color: theme.download_end }}>▼ {fmtBytes(iface.rxBytesPerSec)}</span>
                 {'  '}
                 <span style={{ color: theme.upload_end }}>▲ {fmtBytes(iface.txBytesPerSec)}</span>
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}

@@ -19,15 +19,15 @@ function fmtRate(bps: number) {
 
 const PROC_GRAD: [string, string, string] = [theme.process_start, theme.process_mid, theme.process_end];
 
-type SortKey = 'pid' | 'name' | 'cpu' | 'mem' | 'io';
-const DEFAULT_DESC: Record<SortKey, boolean> = { pid: false, name: false, cpu: true, mem: true, io: true };
-const ioOf = (p: Process) => (p.readBytesPerSec ?? 0) + (p.writeBytesPerSec ?? 0);
+type SortKey = 'pid' | 'name' | 'cpu' | 'mem' | 'read' | 'write';
+const DEFAULT_DESC: Record<SortKey, boolean> = { pid: false, name: false, cpu: true, mem: true, read: true, write: true };
 const COMPARE: Record<SortKey, (a: Process, b: Process) => number> = {
   pid: (a, b) => a.pid - b.pid,
   name: (a, b) => a.name.localeCompare(b.name),
   cpu: (a, b) => a.cpuPercent - b.cpuPercent,
   mem: (a, b) => a.memBytes - b.memBytes,
-  io: (a, b) => ioOf(a) - ioOf(b),
+  read: (a, b) => (a.readBytesPerSec ?? 0) - (b.readBytesPerSec ?? 0),
+  write: (a, b) => (a.writeBytesPerSec ?? 0) - (b.writeBytesPerSec ?? 0),
 };
 
 interface Props {
@@ -95,8 +95,8 @@ export default function ProcessList({ processes, totalMem }: Props) {
             {th('cpu', 'Cpu%', 'right', 60)}
             {th('mem', 'Mem', 'right', 60)}
             <th className="col-wide" style={{ ...cell, textAlign: 'right', color: theme.graph_text, width: 52, cursor: 'default' }}>Mem%</th>
-            {hasIo && th('io', 'Read', 'right', 56, 'col-wide')}
-            {hasIo && th('io', 'Write', 'right', 56, 'col-wide')}
+            {hasIo && th('read', 'Read', 'right', 56, 'col-wide')}
+            {hasIo && th('write', 'Write', 'right', 56, 'col-wide')}
             <th style={{ ...cell, textAlign: 'center', color: theme.graph_text, width: 20, cursor: 'default' }}>S</th>
           </tr>
         </thead>

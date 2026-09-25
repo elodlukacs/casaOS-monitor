@@ -8,6 +8,14 @@ const EXCLUDED_FS = new Set([
   'efivarfs', 'fusectl', 'rpc_pipefs', 'nfsd',
 ]);
 
+// Shares mounted from other machines. statfs() on one whose server has gone
+// away blocks until the mount recovers, and statfsSync would freeze the whole
+// backend with it. They are someone else's disks anyway.
+const NETWORK_FS = new Set([
+  'nfs', 'nfs4', 'cifs', 'smb3', 'smbfs', 'ncpfs', 'afs', 'ceph', 'glusterfs',
+  '9p', 'davfs', 'fuse.sshfs', 'fuse.rclone', 'fuse.s3fs', 'fuse.davfs2',
+]);
+
 function shortLabel(mountpoint) {
   if (mountpoint === '/') return 'root';
   // /media/devmon/sda2-ata-ST4000... → sda2
@@ -36,7 +44,7 @@ function getStorageInfo() {
     const [device, mountpointRaw, fstype] = parts;
     const mountpoint = mountpointRaw.replace(/\\([0-7]{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8)));
 
-    if (EXCLUDED_FS.has(fstype)) continue;
+    if (EXCLUDED_FS.has(fstype) || NETWORK_FS.has(fstype)) continue;
 
     // In Docker, host mounts are rslave-propagated under HOST_ROOT (e.g. /host/root).
     // Only consider mounts that live there so we don't count the container's own FS.
@@ -65,7 +73,9 @@ function getStorageInfo() {
       const total = stat.blocks * stat.bsize;
       const free  = stat.bavail * stat.bsize;
       const used  = total - (stat.bfree * stat.bsize);
-      const usedPercent = total > 0 ? (used / total) * 100 : 0;
+      // Same as df: blocks reserved for root (5% on ext4 by default) count as
+      // neither used nor available, so 100% means full for normal users.
+      const usedPercent = used + free > 0 ? (used / (used + free)) * 100 : 0;
 
       // Skip tiny pseudo-filesystems (< 10 MB)
       if (total < 10 * 1024 * 1024) continue;

@@ -31,6 +31,15 @@ const PROCESS_INTERVAL = 1000;
 const STORAGE_INTERVAL = 5000;
 const DOCKER_INTERVAL = 2000;
 const COOLING_INTERVAL = 1000;   // fan RPM moves slowly; no need to walk hwmon at 10Hz
+// Some sensors are read by sending the device a command (nvme, iwlwifi,
+// drivetemp on SATA disks); once a second is plenty and spares the hardware.
+const TEMP_INTERVAL = 1000;
+// Ping every client this often; one that hasn't answered the previous ping
+// (a phone that went to sleep, a dropped Wi-Fi link) is dropped.
+const HEARTBEAT_MS = 15000;
+// Skip frames for a client whose unsent backlog is over this, instead of
+// queueing without bound for one that stopped reading.
+const MAX_BUFFERED = 1024 * 1024;
 const HISTORY_STEP_MS = 1000;
 const HISTORY_SPAN_MS = 60 * 60 * 1000; // one hour of 1s points, sent on connect
 
@@ -106,6 +115,8 @@ let dockerAt = 0;
 let dockerBusy = false;
 let cooling = null;
 let coolingAt = 0;
+let temperature = null;
+let temperatureAt = 0;
 let lastSample = null;
 
 const history = []; // { t, cpu, temp, rx, tx } at HISTORY_STEP_MS
@@ -147,7 +158,10 @@ function sample(full) {
 
   const cpu = safe(getCpuUsage, []);
   const network = safe(getNetworkInfo, []);
-  const temperature = safe(getTemperatures, null);
+  if (now - temperatureAt >= TEMP_INTERVAL) {
+    temperature = safe(getTemperatures, temperature);
+    temperatureAt = now;
+  }
 
   lastSample = {
     type: 'metrics',
@@ -200,7 +214,7 @@ function tick() {
   if (clients.size === 0) return;
   const now = Date.now();
   for (const [ws, c] of clients) {
-    if (ws.readyState !== ws.OPEN) continue;
+    if (ws.readyState !== ws.OPEN || ws.bufferedAmount > MAX_BUFFERED) continue;
     // Send when this client's own interval has elapsed (with half-tick slack
     // so timer jitter doesn't skip a beat).
     if (now - c.lastSent >= c.intervalMs - timerMs / 2) {
@@ -223,8 +237,21 @@ function reschedule() {
 sample(false);
 reschedule();
 
+// Browsers and the Android WebView answer pings on their own; no client code needed.
+setInterval(() => {
+  for (const [ws, c] of clients) {
+    if (!c.alive) {
+      ws.terminate(); // fires 'close', which removes it
+      continue;
+    }
+    c.alive = false;
+    ws.ping();
+  }
+}, HEARTBEAT_MS);
+
 wss.on('connection', (ws) => {
-  const client = { intervalMs: DEFAULT_INTERVAL, lastSent: 0 };
+  const client = { intervalMs: DEFAULT_INTERVAL, lastSent: 0, alive: true };
+  ws.on('pong', () => { client.alive = true; });
   clients.set(ws, client);
   console.log(`client connected (${clients.size} total)`);
   reschedule();
@@ -243,7 +270,9 @@ wss.on('connection', (ws) => {
       } else if (msg.type === 'getHistory') {
         // Opt-in: clients that only understand metrics frames (the mobile
         // app) never see this message.
-        ws.send(JSON.stringify({ type: 'history', stepMs: HISTORY_STEP_MS, points: history }));
+        // rx/tx in the points belong to the main interface (network[0]).
+        const iface = lastSample && lastSample.network[0] ? lastSample.network[0].iface : null;
+        ws.send(JSON.stringify({ type: 'history', stepMs: HISTORY_STEP_MS, iface, points: history }));
       }
     } catch {}
   });

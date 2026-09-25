@@ -4,7 +4,7 @@ import type { Point } from '../types';
 export type Gradient = [string, string, string]; // bottom, middle, top
 
 interface GraphProps {
-  data: Point[];                       // time-stamped samples, ascending t
+  data: Point[];                       // time-stamped samples, ascending t; may grow in place
   windowMs: number;                    // span shown, ending at the newest sample
   gradient: Gradient;
   max?: number;                        // fixed scale; omit to fit the visible window
@@ -161,7 +161,10 @@ export default function Graph({
       lastT = colT[x];
     }
     flush();
-  }, [data, windowMs, gradient, max, niceMax, size, fillAlpha]);
+    // No dependency list: the caller appends to `data` in place, so the array
+    // reference doesn't change. Every render redraws; renders come from new
+    // frames, window changes and resizes, which are exactly the redraws needed.
+  });
 
   return (
     <div
