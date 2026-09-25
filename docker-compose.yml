@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   casaos-monitor:
     build: .
@@ -9,12 +7,43 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/host/root:ro,rslave
-      # Docker Engine API for the container panel (GET only; read-only is enough)
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - PROC_PATH=/host/proc
       - SYS_PATH=/host/sys
       - HOST_ROOT=/host/root
       - PORT=3030
+      # Container panel, through the read-only proxy below.
+      - DOCKER_HOST=tcp://127.0.0.1:2375
+      # Everything below is optional and read from a .env file next to this
+      # one (copy .env.example to .env). Unset means off. See README.
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - MONITOR_TOKEN=${MONITOR_TOKEN:-}
+      - NTFY_URL=${NTFY_URL:-}
+      - NTFY_TOKEN=${NTFY_TOKEN:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - ALERT_LEVEL=${ALERT_LEVEL:-crit}
+      - ALERT_AFTER_SECONDS=${ALERT_AFTER_SECONDS:-60}
+      - ALERT_REPEAT_HOURS=${ALERT_REPEAT_HOURS:-6}
+      - PLEX_URL=${PLEX_URL:-}
+      - PLEX_TOKEN=${PLEX_TOKEN:-}
     pid: host
+    depends_on:
+      - docker-proxy
+    restart: unless-stopped
+
+  # Gives the monitor container listing and stats, nothing else. Mounting
+  # docker.sock into the monitor itself would give it full control of the
+  # host: a :ro flag on a socket does not make the API read-only.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    container_name: casaos-monitor-docker-proxy
+    environment:
+      - CONTAINERS=1   # GET /containers/json and /containers/{id}/stats
+      - POST=0         # GET/HEAD only (the default, spelled out)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:2375:2375"   # localhost only; never publish this port on the LAN
     restart: unless-stopped

@@ -1,0 +1,9 @@
+# Only backend/ and frontend/ sources go into the image.
+**/node_modules
+frontend/dist
+mobile
+.git
+.github
+.claude
+*.md
+.env

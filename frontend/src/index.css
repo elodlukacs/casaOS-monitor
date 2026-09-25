@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -67,11 +65,14 @@ body {
 /* middle column: net on top (natural height), temp fills the rest */
 .mid-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .mid-col .panel-net { flex: 0 0 auto; }
+.mid-col .panel-gpu { flex: 0 0 auto; }
 .mid-col .panel-temp { flex: 1 1 auto; min-height: 160px; }
 .panel-temp .panel-body { overflow: auto; }
 
 /* right column: docker (capped) on top, proc fills the rest; both scroll inside */
 .right-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.right-col .panel-plex { flex: 0 1 auto; min-height: 0; max-height: 35%; }
+.panel-plex .panel-body { overflow: auto; }
 .right-col .panel-docker { flex: 0 1 auto; min-height: 0; max-height: 45%; }
 .panel-docker .panel-body { overflow: auto; }
 .right-col .panel-proc { flex: 1 1 auto; min-height: 0; }
@@ -105,6 +106,7 @@ body {
   .mid-col { min-height: auto; }
   .right-col { grid-column: 1 / -1; min-height: auto; }
   .right-col .panel-docker { max-height: none; }
+  .right-col .panel-plex { max-height: none; }
   .col-wide { display: none; }
 }
 @media (max-width: 760px) {
@@ -121,3 +123,20 @@ body {
 ::-webkit-scrollbar-track { background: #1a1a1a; }
 ::-webkit-scrollbar-thumb { background: #3f3f3f; border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* ── net: other interfaces, click to graph ── */
+.net-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.net-row:hover { background: #252525; }

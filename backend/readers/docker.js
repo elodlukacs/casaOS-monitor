@@ -1,12 +1,28 @@
 const http = require('http');
 const fs = require('fs');
 
-// Talks to the Docker Engine API over the unix socket, no SDK needed.
-// Mount /var/run/docker.sock into the container (read-only is fine for GETs).
+// Talks to the Docker Engine API, no SDK needed. Only GET requests are made.
+//
+// DOCKER_HOST=tcp://127.0.0.1:2375 points at a docker-socket-proxy that
+// allows container listing and stats only (see docker-compose.yml). That is
+// the recommended setup: a mounted docker.sock is full control of the host,
+// and a :ro mount flag does not change that, it only protects the socket
+// file itself. DOCKER_SOCKET (a unix socket path) is still supported.
+const DOCKER_HOST = process.env.DOCKER_HOST || '';
 const SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
 const TIMEOUT_MS = 4000;
 
+function tcpTarget() {
+  const m = DOCKER_HOST.match(/^tcp:\/\/([^:/]+)(?::(\d+))?\/?$/);
+  return m ? { host: m[1], port: Number(m[2] || 2375) } : null;
+}
+const TCP = tcpTarget();
+if (DOCKER_HOST && !TCP) console.error(`DOCKER_HOST=${DOCKER_HOST} not understood; expected tcp://host:port`);
+
+// Whether a Docker API is configured at all. Reachability is found out by
+// the first request.
 function available() {
+  if (TCP) return true;
   try {
     return fs.statSync(SOCKET).isSocket();
   } catch {
@@ -16,8 +32,9 @@ function available() {
 
 function api(path) {
   return new Promise((resolve, reject) => {
+    const target = TCP ? { host: TCP.host, port: TCP.port } : { socketPath: SOCKET };
     const req = http.request(
-      { socketPath: SOCKET, path, method: 'GET', headers: { Host: 'docker' } },
+      { ...target, path, method: 'GET', headers: { Host: 'docker' } },
       res => {
         let body = '';
         res.setEncoding('utf8');

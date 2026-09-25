@@ -3,7 +3,7 @@ import Panel from './Panel';
 import Graph from './Graph';
 import UsageBar from './UsageBar';
 import { theme, gradAt } from '../theme';
-import { THRESHOLDS, level, levelColor } from '../thresholds';
+import { THRESHOLDS, level, levelColor, sensorThreshold } from '../thresholds';
 
 const TEMP_GRADIENT: [string, string, string] = [theme.temp_start, theme.temp_mid, theme.temp_end];
 const SCALE_MAX = 100; // °C; bars and graph share this scale
@@ -152,7 +152,7 @@ export default function TempPanel({ temperature, cooling, history, windowMs }: P
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {sensors.map((s, i) => {
-                const lc = levelColor(level(s.celsius, THRESHOLDS.sensorTemp));
+                const lc = levelColor(level(s.celsius, sensorThreshold(s.label)));
                 return (
                   <div key={`${s.label}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <SensorLabel label={s.label} color={lc} />
