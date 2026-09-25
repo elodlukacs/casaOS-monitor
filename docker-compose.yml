@@ -14,13 +14,20 @@ services:
       - PORT=3030
       # Container panel, through the read-only proxy below.
       - DOCKER_HOST=tcp://127.0.0.1:2375
-      # Extra browser origins allowed to connect, comma separated. Only needed
-      # when the dashboard is opened through a reverse proxy or another host
-      # name, e.g. https://monitor.example.com
-      # - ALLOWED_ORIGINS=
-      # Optional shared secret; open the page as http://<nas>:3030/?token=<value>.
-      # The Android app cannot send a token, so it stops connecting while set.
-      # - MONITOR_TOKEN=
+      # Everything below is optional and read from a .env file next to this
+      # one (copy .env.example to .env). Unset means off. See README.
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - MONITOR_TOKEN=${MONITOR_TOKEN:-}
+      - NTFY_URL=${NTFY_URL:-}
+      - NTFY_TOKEN=${NTFY_TOKEN:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - ALERT_LEVEL=${ALERT_LEVEL:-crit}
+      - ALERT_AFTER_SECONDS=${ALERT_AFTER_SECONDS:-60}
+      - ALERT_REPEAT_HOURS=${ALERT_REPEAT_HOURS:-6}
+      - PLEX_URL=${PLEX_URL:-}
+      - PLEX_TOKEN=${PLEX_TOKEN:-}
     pid: host
     depends_on:
       - docker-proxy

@@ -15,7 +15,10 @@ const { getTemperatures } = require('./readers/temperature');
 const { getContainers, dockerAvailable } = require('./readers/docker');
 const { getCpuFreq } = require('./readers/cpufreq');
 const { getCooling } = require('./readers/cooling');
+const { getPlexSessions, plexConfigured } = require('./readers/plex');
+const { getGpu } = require('./readers/gpu');
 const { verifyClient, tokenRequired } = require('./access');
+const { createAlerter } = require('./alerts');
 
 process.title = 'casaos-monitor';
 
@@ -31,6 +34,10 @@ const IDLE_INTERVAL = 1000;      // sampling cadence with no clients (keeps hist
 const PROCESS_INTERVAL = 1000;
 const STORAGE_INTERVAL = 5000;
 const DOCKER_INTERVAL = 2000;
+const DOCKER_IDLE_INTERVAL = 10000; // no viewers: only alerts need it
+const PLEX_INTERVAL = 5000;
+const GPU_INTERVAL = 1000;
+const ALERT_CHECK_MS = 1000;
 const COOLING_INTERVAL = 1000;   // fan RPM moves slowly; no need to walk hwmon at 10Hz
 // Some sensors are read by sending the device a command (nvme, iwlwifi,
 // drivetemp on SATA disks); once a second is plenty and spares the hardware.
@@ -127,7 +134,17 @@ let cooling = null;
 let coolingAt = 0;
 let temperature = null;
 let temperatureAt = 0;
+let gpu = null;
+let gpuAt = 0;
+// undefined = Plex not configured (the frame has no plex field, the panel stays hidden)
+let plex = plexConfigured() ? { sessions: [], error: null } : undefined;
+let plexAt = 0;
+let plexBusy = false;
 let lastSample = null;
+
+const alerter = createAlerter({ hostname });
+let alertAt = 0;
+if (alerter.enabled) console.log(`alerts on via ${alerter.channels.join(', ')}`);
 
 const history = []; // { t, cpu, temp, rx, tx } at HISTORY_STEP_MS
 let historyAt = 0;
@@ -156,6 +173,23 @@ function refreshDocker() {
     .finally(() => { dockerBusy = false; });
 }
 
+function refreshPlex() {
+  if (plexBusy || plex === undefined) return;
+  plexBusy = true;
+  getPlexSessions()
+    .then(sessions => {
+      if (plex.error) console.log('plex reachable again');
+      plex = { sessions, error: null };
+    })
+    .catch(e => {
+      if (e.message !== plex.error) console.error('plex error:', e.message);
+      plex = { sessions: [], error: e.message };
+    })
+    .finally(() => { plexBusy = false; });
+}
+
+// `full` = someone is watching. Without viewers only what the history and
+// the alerts need is read.
 function sample(full) {
   const now = Date.now();
   if (full) {
@@ -163,17 +197,27 @@ function sample(full) {
       processes = safe(getProcesses, processes);
       processesAt = now;
     }
+    if (now - coolingAt >= COOLING_INTERVAL) {
+      cooling = safe(getCooling, cooling);
+      coolingAt = now;
+    }
+    if (now - gpuAt >= GPU_INTERVAL) {
+      gpu = safe(getGpu, gpu);
+      gpuAt = now;
+    }
+    if (now - plexAt >= PLEX_INTERVAL) {
+      plexAt = now;
+      refreshPlex();
+    }
+  }
+  if (full || alerter.enabled) {
     if (now - storageAt >= STORAGE_INTERVAL) {
       storage = safe(getStorageInfo, storage);
       storageAt = now;
     }
-    if (now - dockerAt >= DOCKER_INTERVAL) {
+    if (now - dockerAt >= (full ? DOCKER_INTERVAL : DOCKER_IDLE_INTERVAL)) {
       dockerAt = now;
       refreshDocker();
-    }
-    if (now - coolingAt >= COOLING_INTERVAL) {
-      cooling = safe(getCooling, cooling);
-      coolingAt = now;
     }
   }
 
@@ -201,7 +245,14 @@ function sample(full) {
     cooling,
     processes,
     docker,
+    gpu,
+    plex,
   };
+
+  if (alerter.enabled && now - alertAt >= ALERT_CHECK_MS) {
+    alertAt = now;
+    alerter.check(lastSample);
+  }
 
   if (now - historyAt >= HISTORY_STEP_MS) {
     historyAt = now;

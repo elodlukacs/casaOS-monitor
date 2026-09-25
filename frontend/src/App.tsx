@@ -6,6 +6,8 @@ import NetworkPanel from './components/NetworkPanel';
 import type { NetSeries } from './components/NetworkPanel';
 import TempPanel from './components/TempPanel';
 import DockerPanel from './components/DockerPanel';
+import GpuPanel from './components/GpuPanel';
+import PlexPanel from './components/PlexPanel';
 import ProcessList from './components/ProcessList';
 import { theme } from './theme';
 import { collectAlerts, levelColor, worst } from './thresholds';
@@ -364,9 +366,11 @@ export default function App() {
             onPick={pickIface}
             windowMs={windowMs}
           />
+          {metrics.gpu && <GpuPanel gpu={metrics.gpu} />}
           <TempPanel temperature={metrics.temperature} cooling={metrics.cooling ?? null} history={s.temp} windowMs={windowMs} />
         </div>
         <div className="right-col">
+          {metrics.plex && <PlexPanel plex={metrics.plex} />}
           {metrics.docker !== undefined && <DockerPanel containers={metrics.docker} />}
           <ProcessList processes={metrics.processes} totalMem={metrics.memory.total} />
         </div>

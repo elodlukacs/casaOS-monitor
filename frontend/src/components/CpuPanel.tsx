@@ -3,7 +3,7 @@ import Panel from './Panel';
 import Graph from './Graph';
 import UsageBar from './UsageBar';
 import { theme, gradAt } from '../theme';
-import { levelColor } from '../thresholds';
+import { THRESHOLDS, level, levelColor } from '../thresholds';
 
 const CPU_GRADIENT: [string, string, string] = [theme.cpu_start, theme.cpu_mid, theme.cpu_end];
 const FREQ_COLOR = theme.cached_mid;
@@ -118,6 +118,25 @@ export default function CpuPanel({ cores, freq, history, windowMs, uptime, cpuMo
               <span style={{ color: theme.fg }}>
                 {loadAvg.one.toFixed(2)} {loadAvg.five.toFixed(2)} {loadAvg.fifteen.toFixed(2)}
               </span>
+              {total?.iowait !== undefined && (
+                <span
+                  style={{ marginLeft: 12 }}
+                  title="share of CPU time spent idle waiting for disk I/O; high means the disks are the bottleneck"
+                >
+                  iowait{' '}
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      minWidth: '4ch',
+                      textAlign: 'right',
+                      color: levelColor(level(total.iowait, THRESHOLDS.ioWait)) ?? theme.fg,
+                      fontWeight: level(total.iowait, THRESHOLDS.ioWait) === 'ok' ? 400 : 700,
+                    }}
+                  >
+                    {total.iowait.toFixed(0)}%
+                  </span>
+                </span>
+              )}
             </span>
             <span
               style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}

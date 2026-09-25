@@ -17,6 +17,7 @@ export const THRESHOLDS = {
   memUsed: { warn: 85, crit: 95 },
   swapUsed: { warn: 50, crit: 80 },
   diskBusy: { warn: 80, crit: 95 },
+  ioWait: { warn: 10, crit: 30 },    // % of CPU time waiting on disks
 } satisfies Record<string, Threshold>;
 
 // Thresholds for one entry of temperature.all, by its "chip/label" name.
@@ -57,6 +58,7 @@ export function collectAlerts(m: Metrics): Alert[] {
   if (m.temperature) {
     add(level(m.temperature.cpu, THRESHOLDS.cpuTemp), `cpu ${m.temperature.cpu.toFixed(0)}°C`);
     for (const s of m.temperature.all) {
+      if (s.label === m.temperature.cpuLabel) continue; // shown as "cpu" already
       const l = level(s.celsius, sensorThreshold(s.label));
       if (l === 'crit') add(l, `${s.label} ${s.celsius.toFixed(0)}°C`);
     }
