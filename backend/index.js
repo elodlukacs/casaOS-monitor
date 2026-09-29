@@ -15,6 +15,7 @@ const { getTemperatures } = require('./readers/temperature');
 const { getContainers, dockerAvailable } = require('./readers/docker');
 const { getCpuFreq } = require('./readers/cpufreq');
 const { getCooling } = require('./readers/cooling');
+const { getTorrents, qbitConfigured } = require('./readers/qbittorrent');
 
 process.title = 'casaos-monitor';
 
@@ -30,6 +31,7 @@ const IDLE_INTERVAL = 1000;      // sampling cadence with no clients (keeps hist
 const PROCESS_INTERVAL = 1000;
 const STORAGE_INTERVAL = 5000;
 const DOCKER_INTERVAL = 2000;
+const QBIT_INTERVAL = 2000;
 const COOLING_INTERVAL = 1000;   // fan RPM moves slowly; no need to walk hwmon at 10Hz
 const HISTORY_STEP_MS = 1000;
 const HISTORY_SPAN_MS = 60 * 60 * 1000; // one hour of 1s points, sent on connect
@@ -106,6 +108,10 @@ let dockerAt = 0;
 let dockerBusy = false;
 let cooling = null;
 let coolingAt = 0;
+let qbit = qbitConfigured() ? { dlSpeed: 0, upSpeed: 0, torrents: [], error: null } : null; // null = QBIT_URL unset
+let qbitAt = 0;
+let qbitBusy = false;
+let qbitLastError = null;
 let lastSample = null;
 
 const history = []; // { t, cpu, temp, rx, tx } at HISTORY_STEP_MS
@@ -124,6 +130,24 @@ function refreshDocker() {
     .finally(() => { dockerBusy = false; });
 }
 
+function refreshQbit() {
+  if (qbitBusy || qbit === null) return;
+  qbitBusy = true;
+  getTorrents()
+    .then(q => {
+      qbit = q;
+      qbitLastError = null;
+    })
+    .catch(e => {
+      const msg = e.cause?.code || e.message;
+      // Log once per distinct failure, not every 2s.
+      if (msg !== qbitLastError) console.error('qbittorrent error:', msg);
+      qbitLastError = msg;
+      qbit = { dlSpeed: 0, upSpeed: 0, torrents: [], error: msg };
+    })
+    .finally(() => { qbitBusy = false; });
+}
+
 function sample(full) {
   const now = Date.now();
   if (full) {
@@ -138,6 +162,10 @@ function sample(full) {
     if (now - dockerAt >= DOCKER_INTERVAL) {
       dockerAt = now;
       refreshDocker();
+    }
+    if (now - qbitAt >= QBIT_INTERVAL) {
+      qbitAt = now;
+      refreshQbit();
     }
     if (now - coolingAt >= COOLING_INTERVAL) {
       cooling = safe(getCooling, cooling);
@@ -166,6 +194,7 @@ function sample(full) {
     cooling,
     processes,
     docker,
+    qbittorrent: qbit,
   };
 
   if (now - historyAt >= HISTORY_STEP_MS) {

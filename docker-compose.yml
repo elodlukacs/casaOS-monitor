@@ -16,5 +16,9 @@ services:
       - SYS_PATH=/host/sys
       - HOST_ROOT=/host/root
       - PORT=3030
+      # qBittorrent WebUI for the torrents panel (remove to hide it). No login is
+      # sent: whitelist 172.16.0.0/12 under WebUI → "Bypass authentication for
+      # clients in whitelisted IP subnets".
+      - QBIT_URL=http://localhost:8181
     pid: host
     restart: unless-stopped

@@ -71,6 +71,27 @@ export interface DockerContainer {
   txBytesPerSec: number;
 }
 
+export interface Torrent {
+  hash: string;
+  name: string;
+  state: string;         // qBittorrent state, e.g. downloading, uploading, stalledDL
+  progress: number;      // 0..1
+  size: number;
+  dlSpeed: number;       // bytes/s
+  upSpeed: number;
+  eta: number | null;    // seconds; null when unknown or idle
+  seeds: number;
+  peers: number;
+  ratio: number;
+}
+
+export interface QbitInfo {
+  dlSpeed: number;       // global transfer rates, bytes/s
+  upSpeed: number;
+  torrents: Torrent[];   // only those with traffic (kept ~10s after it stops)
+  error: string | null;  // WebUI unreachable / not authorised
+}
+
 export interface CpuFreq {
   cores: (number | null)[]; // MHz, index = logical cpu number (cpuN)
   avg: number;              // MHz, mean of cores with a reading
@@ -109,6 +130,7 @@ export interface Metrics {
   cooling?: Cooling | null;
   processes: Process[];
   docker?: DockerContainer[] | null; // null: docker socket not mounted
+  qbittorrent?: QbitInfo | null;     // null: QBIT_URL not set
 }
 
 export interface HistoryPoint {
