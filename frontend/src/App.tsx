@@ -205,6 +205,8 @@ export default function App() {
   }
 
   const alertColor = levelColor(worst(alerts.map(a => a.level)));
+  // Plex / qBittorrent column; dropped (two-column grid) when neither is configured.
+  const hasApps = !!(metrics.plex || metrics.qbittorrent);
 
   return (
     <div className="app">
@@ -271,15 +273,17 @@ export default function App() {
         loadAvg={metrics.loadAvg ?? { one: 0, five: 0, fifteen: 0 }}
       />
 
-      <div className="main-grid">
-        <div className="left-col">
-          <MemoryPanel memory={metrics.memory} disk={metrics.disk} storage={metrics.storage ?? []} />
-          {metrics.qbittorrent && <TorrentPanel qbit={metrics.qbittorrent} />}
-        </div>
+      <div className={'main-grid' + (hasApps ? '' : ' no-apps')}>
+        {hasApps && (
+          <div className="left-col">
+            {metrics.plex && <PlexPanel plex={metrics.plex} />}
+            {metrics.qbittorrent && <TorrentPanel qbit={metrics.qbittorrent} />}
+          </div>
+        )}
         <div className="mid-col">
+          <MemoryPanel memory={metrics.memory} disk={metrics.disk} storage={metrics.storage ?? []} />
           <NetworkPanel network={metrics.network} rxHistory={history.rx} txHistory={history.tx} windowMs={windowMs} />
           <TempPanel temperature={metrics.temperature} cooling={metrics.cooling ?? null} history={history.temp} windowMs={windowMs} />
-          {metrics.plex && <PlexPanel plex={metrics.plex} />}
         </div>
         <div className="right-col">
           {metrics.docker !== undefined && <DockerPanel containers={metrics.docker} />}
