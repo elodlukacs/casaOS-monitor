@@ -5,6 +5,7 @@ import MemoryPanel from './components/MemoryPanel';
 import NetworkPanel from './components/NetworkPanel';
 import TempPanel from './components/TempPanel';
 import DockerPanel from './components/DockerPanel';
+import TorrentPanel from './components/TorrentPanel';
 import ProcessList from './components/ProcessList';
 import { theme } from './theme';
 import { collectAlerts, levelColor, worst } from './thresholds';
@@ -277,6 +278,7 @@ export default function App() {
         </div>
         <div className="right-col">
           {metrics.docker !== undefined && <DockerPanel containers={metrics.docker} />}
+          {metrics.qbittorrent && <TorrentPanel qbit={metrics.qbittorrent} />}
           <ProcessList processes={metrics.processes} totalMem={metrics.memory.total} />
         </div>
       </div>

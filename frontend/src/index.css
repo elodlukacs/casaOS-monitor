@@ -74,6 +74,8 @@ body {
 .right-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .right-col .panel-docker { flex: 0 1 auto; min-height: 0; max-height: 45%; }
 .panel-docker .panel-body { overflow: auto; }
+.right-col .panel-torrent { flex: 0 1 auto; min-height: 0; max-height: 30%; }
+.panel-torrent .panel-body { overflow: auto; }
 .right-col .panel-proc { flex: 1 1 auto; min-height: 0; }
 .panel-proc .panel-body { overflow: auto; }
 
@@ -104,7 +106,7 @@ body {
   .main-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; }
   .mid-col { min-height: auto; }
   .right-col { grid-column: 1 / -1; min-height: auto; }
-  .right-col .panel-docker { max-height: none; }
+  .right-col .panel-docker, .right-col .panel-torrent { max-height: none; }
   .col-wide { display: none; }
 }
 @media (max-width: 760px) {
