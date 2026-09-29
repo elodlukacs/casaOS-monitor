@@ -110,8 +110,16 @@ export interface PlexSession {
   decision: 'direct play' | 'direct stream' | 'transcode';
 }
 
+export interface PlexLibrary {
+  key: string;
+  title: string;
+  type: string;            // movie | show | artist | photo
+  counts: { label: string; n: number }[]; // e.g. shows 85, episodes 4321
+}
+
 export interface PlexInfo {
   sessions: PlexSession[];
+  libraries: PlexLibrary[]; // refreshed every 5 min
   error: string | null;    // server unreachable / not authorised
 }
 
