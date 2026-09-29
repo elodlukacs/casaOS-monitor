@@ -67,6 +67,7 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
     <Panel
       title="mem"
       num="2"
+      className="panel-mem"
       borderColor={theme.mem_box}
       bottomRight={
         <>

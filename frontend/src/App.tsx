@@ -271,14 +271,16 @@ export default function App() {
       />
 
       <div className="main-grid">
-        <MemoryPanel memory={metrics.memory} disk={metrics.disk} storage={metrics.storage ?? []} />
+        <div className="left-col">
+          <MemoryPanel memory={metrics.memory} disk={metrics.disk} storage={metrics.storage ?? []} />
+          {metrics.qbittorrent && <TorrentPanel qbit={metrics.qbittorrent} />}
+        </div>
         <div className="mid-col">
           <NetworkPanel network={metrics.network} rxHistory={history.rx} txHistory={history.tx} windowMs={windowMs} />
           <TempPanel temperature={metrics.temperature} cooling={metrics.cooling ?? null} history={history.temp} windowMs={windowMs} />
         </div>
         <div className="right-col">
           {metrics.docker !== undefined && <DockerPanel containers={metrics.docker} />}
-          {metrics.qbittorrent && <TorrentPanel qbit={metrics.qbittorrent} />}
           <ProcessList processes={metrics.processes} totalMem={metrics.memory.total} />
         </div>
       </div>

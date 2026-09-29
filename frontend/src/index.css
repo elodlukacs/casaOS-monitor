@@ -15,7 +15,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── page layout: header / cpu / (mem | net+temp | docker+proc), fills the viewport ── */
+/* ── page layout: header / cpu / (mem+torrents | net+temp | docker+proc), fills the viewport ── */
 .app {
   height: 100%;
   display: flex;
@@ -64,6 +64,14 @@ body {
 .panel { display: flex; flex-direction: column; }
 .panel-body { flex: 1; min-height: 0; padding: 14px 12px 10px; }
 
+/* left column: mem at natural height, torrents fill the rest (mem fills it
+   alone when qBittorrent isn't configured) */
+.left-col { display: flex; flex-direction: column; gap: 12px; }
+.left-col .panel-mem { flex: 0 0 auto; }
+.left-col .panel-mem:only-child { flex: 1 1 auto; }
+.left-col .panel-torrent { flex: 1 1 0; min-height: 140px; }
+.panel-torrent .panel-body { overflow: auto; }
+
 /* middle column: net on top (natural height), temp fills the rest */
 .mid-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .mid-col .panel-net { flex: 0 0 auto; }
@@ -74,8 +82,6 @@ body {
 .right-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .right-col .panel-docker { flex: 0 1 auto; min-height: 0; max-height: 45%; }
 .panel-docker .panel-body { overflow: auto; }
-.right-col .panel-torrent { flex: 0 1 auto; min-height: 0; max-height: 30%; }
-.panel-torrent .panel-body { overflow: auto; }
 .right-col .panel-proc { flex: 1 1 auto; min-height: 0; }
 .panel-proc .panel-body { overflow: auto; }
 
@@ -106,7 +112,8 @@ body {
   .main-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; }
   .mid-col { min-height: auto; }
   .right-col { grid-column: 1 / -1; min-height: auto; }
-  .right-col .panel-docker, .right-col .panel-torrent { max-height: none; }
+  .right-col .panel-docker { max-height: none; }
+  .left-col .panel-torrent { flex: 0 0 auto; }
   .col-wide { display: none; }
 }
 @media (max-width: 760px) {
