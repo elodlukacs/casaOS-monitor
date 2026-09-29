@@ -6,6 +6,7 @@ import NetworkPanel from './components/NetworkPanel';
 import TempPanel from './components/TempPanel';
 import DockerPanel from './components/DockerPanel';
 import TorrentPanel from './components/TorrentPanel';
+import PlexPanel from './components/PlexPanel';
 import ProcessList from './components/ProcessList';
 import { theme } from './theme';
 import { collectAlerts, levelColor, worst } from './thresholds';
@@ -278,6 +279,7 @@ export default function App() {
         <div className="mid-col">
           <NetworkPanel network={metrics.network} rxHistory={history.rx} txHistory={history.tx} windowMs={windowMs} />
           <TempPanel temperature={metrics.temperature} cooling={metrics.cooling ?? null} history={history.temp} windowMs={windowMs} />
+          {metrics.plex && <PlexPanel plex={metrics.plex} />}
         </div>
         <div className="right-col">
           {metrics.docker !== undefined && <DockerPanel containers={metrics.docker} />}

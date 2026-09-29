@@ -19,6 +19,8 @@ export const theme = {
   temp_box: '#3a5f8f',
   docker_box: '#2f6f8f',
   torrent_box: '#6a4a8f',
+  plex_box: '#8f6a2a',
+  plex: '#e5a00d',
   div_line: '#303030',
   // cpu gradient (bottom → top)
   cpu_start: '#50f095',

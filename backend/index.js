@@ -16,6 +16,7 @@ const { getContainers, dockerAvailable } = require('./readers/docker');
 const { getCpuFreq } = require('./readers/cpufreq');
 const { getCooling } = require('./readers/cooling');
 const { getTorrents, qbitConfigured } = require('./readers/qbittorrent');
+const { getSessions, plexConfigured } = require('./readers/plex');
 
 process.title = 'casaos-monitor';
 
@@ -31,7 +32,7 @@ const IDLE_INTERVAL = 1000;      // sampling cadence with no clients (keeps hist
 const PROCESS_INTERVAL = 1000;
 const STORAGE_INTERVAL = 5000;
 const DOCKER_INTERVAL = 2000;
-const QBIT_INTERVAL = 2000;
+const APP_INTERVAL = 2000;     // qBittorrent / Plex HTTP APIs
 const COOLING_INTERVAL = 1000;   // fan RPM moves slowly; no need to walk hwmon at 10Hz
 const HISTORY_STEP_MS = 1000;
 const HISTORY_SPAN_MS = 60 * 60 * 1000; // one hour of 1s points, sent on connect
@@ -108,10 +109,6 @@ let dockerAt = 0;
 let dockerBusy = false;
 let cooling = null;
 let coolingAt = 0;
-let qbit = qbitConfigured() ? { dlSpeed: 0, upSpeed: 0, torrents: [], error: null } : null; // null = QBIT_URL unset
-let qbitAt = 0;
-let qbitBusy = false;
-let qbitLastError = null;
 let lastSample = null;
 
 const history = []; // { t, cpu, temp, rx, tx } at HISTORY_STEP_MS
@@ -130,23 +127,33 @@ function refreshDocker() {
     .finally(() => { dockerBusy = false; });
 }
 
-function refreshQbit() {
-  if (qbitBusy || qbit === null) return;
-  qbitBusy = true;
-  getTorrents()
-    .then(q => {
-      qbit = q;
-      qbitLastError = null;
-    })
-    .catch(e => {
-      const msg = e.cause?.code || e.message;
-      // Log once per distinct failure, not every 2s.
-      if (msg !== qbitLastError) console.error('qbittorrent error:', msg);
-      qbitLastError = msg;
-      qbit = { dlSpeed: 0, upSpeed: 0, torrents: [], error: msg };
-    })
-    .finally(() => { qbitBusy = false; });
+// An app's HTTP API polled off the sampler's clock, one request in flight.
+// `value` is null when the app isn't configured (its panel is hidden);
+// on failure it's the empty shape with `error` set, which the panel shows.
+function appPoller(name, enabled, load, empty) {
+  const p = { value: enabled ? { ...empty, error: null } : null, at: 0, busy: false, lastError: null };
+  p.refresh = () => {
+    if (p.busy || p.value === null) return;
+    p.busy = true;
+    load()
+      .then(v => {
+        p.value = v;
+        p.lastError = null;
+      })
+      .catch(e => {
+        const msg = e.cause?.code || e.message;
+        // Log once per distinct failure, not every poll.
+        if (msg !== p.lastError) console.error(`${name} error:`, msg);
+        p.lastError = msg;
+        p.value = { ...empty, error: msg };
+      })
+      .finally(() => { p.busy = false; });
+  };
+  return p;
 }
+
+const qbit = appPoller('qbittorrent', qbitConfigured(), getTorrents, { dlSpeed: 0, upSpeed: 0, torrents: [] });
+const plex = appPoller('plex', plexConfigured(), getSessions, { sessions: [] });
 
 function sample(full) {
   const now = Date.now();
@@ -163,9 +170,11 @@ function sample(full) {
       dockerAt = now;
       refreshDocker();
     }
-    if (now - qbitAt >= QBIT_INTERVAL) {
-      qbitAt = now;
-      refreshQbit();
+    for (const p of [qbit, plex]) {
+      if (now - p.at >= APP_INTERVAL) {
+        p.at = now;
+        p.refresh();
+      }
     }
     if (now - coolingAt >= COOLING_INTERVAL) {
       cooling = safe(getCooling, cooling);
@@ -194,7 +203,8 @@ function sample(full) {
     cooling,
     processes,
     docker,
-    qbittorrent: qbit,
+    qbittorrent: qbit.value,
+    plex: plex.value,
   };
 
   if (now - historyAt >= HISTORY_STEP_MS) {

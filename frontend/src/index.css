@@ -15,7 +15,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── page layout: header / cpu / (mem+torrents | net+temp | docker+proc), fills the viewport ── */
+/* ── page layout: header / cpu / (mem+torrents | net+temp+plex | docker+proc), fills the viewport ── */
 .app {
   height: 100%;
   display: flex;
@@ -72,11 +72,18 @@ body {
 .left-col .panel-torrent { flex: 1 1 0; min-height: 140px; }
 .panel-torrent .panel-body { overflow: auto; }
 
-/* middle column: net on top (natural height), temp fills the rest */
+/* middle column: net on top (natural height), temp fills the rest, or plex
+   does when Plex is configured */
 .mid-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .mid-col .panel-net { flex: 0 0 auto; }
 .mid-col .panel-temp { flex: 1 1 auto; min-height: 160px; }
+.mid-col .panel-temp:not(:last-child) { flex: 0 0 auto; }
 .panel-temp .panel-body { overflow: auto; }
+.mid-col .panel-plex { flex: 1 1 0; min-height: 140px; }
+/* net + temp + plex can outgrow a short viewport: grow the row (page
+   scrolls, columns stay aligned) rather than overflow the column */
+.mid-col:has(.panel-plex) { min-height: auto; }
+.panel-plex .panel-body { overflow: auto; }
 
 /* right column: docker (capped) on top, proc fills the rest; both scroll inside */
 .right-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
@@ -113,7 +120,7 @@ body {
   .mid-col { min-height: auto; }
   .right-col { grid-column: 1 / -1; min-height: auto; }
   .right-col .panel-docker { max-height: none; }
-  .left-col .panel-torrent { flex: 0 0 auto; }
+  .left-col .panel-torrent, .mid-col .panel-plex { flex: 0 0 auto; }
   .col-wide { display: none; }
 }
 @media (max-width: 760px) {
