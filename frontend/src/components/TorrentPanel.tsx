@@ -68,17 +68,16 @@ export default function TorrentPanel({ qbit }: Props) {
               {th('▼', 'right', 52)}
               {th('▲', 'right', 52)}
               {th('Eta', 'right', 36)}
-              {th('Size', 'right', 48, 'col-wide')}
-              {th('Peers', 'right', 44, 'col-wide')}
             </tr>
           </thead>
           <tbody>
             {qbit.torrents.map(t => {
               const idle = t.dlSpeed === 0 && t.upSpeed === 0;
               return (
-                <tr key={t.hash}>
+                // Size and peers live in the tooltip: the column is narrow and
+                // the name is what you scan for.
+                <tr key={t.hash} title={`${t.name}\n${t.state} · ${fmtSize(t.size)} · ${t.seeds} seeds / ${t.peers} peers · ratio ${t.ratio.toFixed(2)}`}>
                   <td
-                    title={`${t.name} · ${t.state} · ratio ${t.ratio.toFixed(2)}`}
                     style={{ ...cell, color: idle ? theme.graph_text : theme.fg, maxWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
                   >
                     {t.name}
@@ -89,8 +88,6 @@ export default function TorrentPanel({ qbit }: Props) {
                   <td style={{ ...cell, textAlign: 'right', color: t.dlSpeed > 0 ? theme.download_end : theme.graph_text }}>{fmtRate(t.dlSpeed)}</td>
                   <td style={{ ...cell, textAlign: 'right', color: t.upSpeed > 0 ? theme.upload_end : theme.graph_text }}>{fmtRate(t.upSpeed)}</td>
                   <td style={{ ...cell, textAlign: 'right', color: theme.graph_text }}>{fmtEta(t)}</td>
-                  <td className="col-wide" style={{ ...cell, textAlign: 'right', color: theme.graph_text }}>{fmtSize(t.size)}</td>
-                  <td className="col-wide" style={{ ...cell, textAlign: 'right', color: theme.graph_text }}>{t.seeds}/{t.peers}</td>
                 </tr>
               );
             })}
