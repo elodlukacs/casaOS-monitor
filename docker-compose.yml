@@ -24,7 +24,7 @@ services:
       # set PLEX_TOKEN, or add 172.16.0.0/12 (bridge-networked Plex) or
       # 127.0.0.1/32 (host-networked Plex) under Settings → Network → "List of
       # IP addresses and networks that are allowed without auth".
-      - PLEX_URL=http://localhost:32400
+      - PLEX_URL=http://127.0.0.1:32400
       # - PLEX_TOKEN=
     pid: host
     restart: unless-stopped
