@@ -16,5 +16,8 @@ mobile/android/build/
 .DS_Store
 **/.DS_Store
 
+# Secrets (PLEX_TOKEN for docker compose)
+.env
+
 # Local Claude config
 .claude/

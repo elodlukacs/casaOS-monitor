@@ -15,7 +15,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── page layout: header / cpu / (mem+torrents | net+temp | docker+proc), fills the viewport ── */
+/* ── page layout: header / cpu / (plex+torrents | mem+net+temp | docker+proc), fills the viewport ── */
 .app {
   height: 100%;
   display: flex;
@@ -49,8 +49,8 @@ body {
 .interval-btn:hover { color: #cccccc; border-color: #303030; }
 .interval-btn.active { color: #0de756; border-color: #3d7b46; }
 
-/* mem and net always show in full; the right column takes the remaining
-   height and scrolls inside. The page itself only scrolls if mem/net outgrow it. */
+/* mem and net always show in full; the side columns take the remaining
+   height and scroll inside. The page itself only scrolls if mem/net/temp outgrow it. */
 .main-grid {
   flex: 1;
   min-height: 0;
@@ -64,17 +64,21 @@ body {
 .panel { display: flex; flex-direction: column; }
 .panel-body { flex: 1; min-height: 0; padding: 14px 12px 10px; }
 
-/* left column: mem at natural height, torrents fill the rest (mem fills it
-   alone when qBittorrent isn't configured) */
-.left-col { display: flex; flex-direction: column; gap: 12px; }
-.left-col .panel-mem { flex: 0 0 auto; }
-.left-col .panel-mem:only-child { flex: 1 1 auto; }
-.left-col .panel-torrent { flex: 1 1 0; min-height: 140px; }
-.panel-torrent .panel-body { overflow: auto; }
+.main-grid.no-apps { grid-template-columns: minmax(300px, 30%) minmax(0, 1fr); }
 
-/* middle column: net on top (natural height), temp fills the rest */
-.mid-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
-.mid-col .panel-net { flex: 0 0 auto; }
+/* left column: plex at natural height (capped), torrents fill the rest;
+   either fills the column alone when the other isn't configured */
+.left-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.left-col .panel-plex { flex: 0 1 auto; min-height: 90px; max-height: 55%; }
+.left-col .panel-torrent { flex: 1 1 0; min-height: 140px; }
+.left-col > .panel:only-child { flex: 1 1 auto; max-height: none; }
+.panel-plex .panel-body, .panel-torrent .panel-body { overflow: auto; }
+
+/* middle column: mem and net at natural height, temp fills the rest. No
+   min-height: 0, so on a short viewport the row grows (page scrolls,
+   columns stay aligned) instead of this column overflowing. */
+.mid-col { display: flex; flex-direction: column; gap: 12px; }
+.mid-col .panel-mem, .mid-col .panel-net { flex: 0 0 auto; }
 .mid-col .panel-temp { flex: 1 1 auto; min-height: 160px; }
 .panel-temp .panel-body { overflow: auto; }
 
@@ -110,10 +114,11 @@ body {
   /* document flow: rows size to content and the page scrolls */
   .app { height: auto; min-height: 100%; }
   .main-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; }
-  .mid-col { min-height: auto; }
+  .left-col { min-height: auto; }
   .right-col { grid-column: 1 / -1; min-height: auto; }
-  .right-col .panel-docker { max-height: none; }
-  .left-col .panel-torrent { flex: 0 0 auto; }
+  .main-grid.no-apps .mid-col { grid-column: 1 / -1; }
+  .right-col .panel-docker, .left-col .panel-plex { max-height: none; }
+  .left-col .panel-plex, .left-col .panel-torrent { flex: 0 0 auto; }
   .col-wide { display: none; }
 }
 @media (max-width: 760px) {
@@ -121,7 +126,7 @@ body {
   .cpu-body { flex-direction: column; }
   .cpu-divider { display: none; }
   .cpu-side { width: auto !important; max-width: none !important; }
-  .main-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .main-grid, .main-grid.no-apps { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   .mid-col .panel-temp { flex: 0 0 auto; }
   /* no height cap here: the page scrolls; the tables can still scroll sideways */
 }

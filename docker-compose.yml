@@ -20,5 +20,14 @@ services:
       # sent: whitelist 172.16.0.0/12 under WebUI → "Bypass authentication for
       # clients in whitelisted IP subnets".
       - QBIT_URL=http://localhost:8181
+      # Plex Media Server for the "now playing" panel (remove to hide it). Either
+      # set PLEX_TOKEN, or add the address Plex sees under Settings → Network →
+      # "List of IP addresses and networks that are allowed without auth":
+      # the server's LAN IP for host-networked Plex, 172.16.0.0/255.240.0.0 for
+      # bridge-networked. Don't use localhost/127.0.0.1: Plex classifies
+      # loopback requests separately and ignores the list for them (401).
+      - PLEX_URL=http://192.168.1.238:32400
+      # token from a .env file next to this one (gitignored): PLEX_TOKEN=...
+      - PLEX_TOKEN=${PLEX_TOKEN:-}
     pid: host
     restart: unless-stopped

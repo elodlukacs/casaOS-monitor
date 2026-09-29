@@ -92,6 +92,29 @@ export interface QbitInfo {
   error: string | null;  // WebUI unreachable / not authorised
 }
 
+export interface PlexSession {
+  id: string;
+  type: string;            // movie | episode | track | clip
+  title: string;
+  parent: string | null;   // show for episodes, artist for tracks
+  season: number | null;
+  episode: number | null;
+  year: number | null;
+  duration: number;        // ms
+  offset: number;          // ms, advanced between client reports while playing
+  state: string;           // playing | paused | buffering
+  user: string;
+  player: string;          // device name, e.g. "Living Room TV"
+  local: boolean;          // on the LAN vs remote
+  bandwidthKbps: number | null;
+  decision: 'direct play' | 'direct stream' | 'transcode';
+}
+
+export interface PlexInfo {
+  sessions: PlexSession[];
+  error: string | null;    // server unreachable / not authorised
+}
+
 export interface CpuFreq {
   cores: (number | null)[]; // MHz, index = logical cpu number (cpuN)
   avg: number;              // MHz, mean of cores with a reading
@@ -131,6 +154,7 @@ export interface Metrics {
   processes: Process[];
   docker?: DockerContainer[] | null; // null: docker socket not mounted
   qbittorrent?: QbitInfo | null;     // null: QBIT_URL not set
+  plex?: PlexInfo | null;            // null: PLEX_URL not set
 }
 
 export interface HistoryPoint {
