@@ -35,9 +35,7 @@ interface Props {
 }
 
 const USED: [string, string, string] = [theme.used_start, theme.used_mid, theme.used_end];
-const AVAIL: [string, string, string] = [theme.available_start, theme.available_mid, theme.available_end];
 const CACHED: [string, string, string] = [theme.cached_start, theme.cached_mid, theme.cached_end];
-const FREE: [string, string, string] = [theme.free_start, theme.free_mid, theme.free_end];
 
 const MIN_MOUNT_SIZE = 1024 * 1024 * 1024;
 
@@ -56,6 +54,10 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
   const pct = (v: number) => (memory.total > 0 ? (v / memory.total) * 100 : 0);
   // older backends sent MemAvailable as `free`; fall back so nothing shows 0
   const available = memory.available ?? memory.free;
+  // In use + cache + free = total: "in use" is what programs hold (total -
+  // available), "cache" is the part of available the kernel reclaims on
+  // demand. /proc's Cached overlaps both, so it isn't used here.
+  const cache = Math.max(0, available - memory.free);
   const usedColor = levelColor(level(memory.usedPercent, THRESHOLDS.memUsed));
   const swapColor = levelColor(level(memory.swap.usedPercent, THRESHOLDS.swapUsed));
 
@@ -76,16 +78,13 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
         </>
       }
     >
-      <UsageBar label="Used"      value={memory.usedPercent} total={fmtBytes(memory.used)}   gradient={USED}   labelWidth={72} valueColor={usedColor} />
-      <UsageBar label="Available" value={pct(available)}     total={fmtBytes(available)}     gradient={AVAIL}  labelWidth={72} />
-      <UsageBar label="Cached"    value={pct(memory.cached)} total={fmtBytes(memory.cached)} gradient={CACHED} labelWidth={72} />
-      <UsageBar label="Free"      value={pct(memory.free)}   total={fmtBytes(memory.free)}   gradient={FREE}   labelWidth={72} />
-
+      <UsageBar label="In use" value={memory.usedPercent} total={fmtBytes(memory.used)} gradient={USED}   labelWidth={72} valueColor={usedColor} />
+      <UsageBar label="Cache"  value={pct(cache)}         total={fmtBytes(cache)}       gradient={CACHED} labelWidth={72} />
+      <div style={{ fontSize: 10, lineHeight: '14px', color: theme.graph_text, margin: '0 0 4px 78px' }}>
+        freed automatically when needed · {fmtBytes(memory.free)} unused
+      </div>
       {memory.swap.total > 0 && (
-        <>
-          <SectionLabel>─ swap ─</SectionLabel>
-          <UsageBar label="Swap" value={memory.swap.usedPercent} total={fmtBytes(memory.swap.used)} gradient={USED} labelWidth={72} valueColor={swapColor} />
-        </>
+        <UsageBar label="Swap" value={memory.swap.usedPercent} total={fmtBytes(memory.swap.used)} gradient={USED} labelWidth={72} valueColor={swapColor} />
       )}
 
       {drives.length > 0 && (
