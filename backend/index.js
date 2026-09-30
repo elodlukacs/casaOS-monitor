@@ -15,6 +15,7 @@ const { getTemperatures } = require('./readers/temperature');
 const { getContainers, dockerAvailable } = require('./readers/docker');
 const { getCpuFreq } = require('./readers/cpufreq');
 const { getCooling } = require('./readers/cooling');
+const { getGpu } = require('./readers/gpu');
 const { getTorrents, qbitConfigured } = require('./readers/qbittorrent');
 const { getSessions, plexConfigured } = require('./readers/plex');
 const { verifyClient, tokenRequired } = require('./access');
@@ -35,6 +36,7 @@ const STORAGE_INTERVAL = 5000;
 const DOCKER_INTERVAL = 2000;
 const APP_INTERVAL = 2000;     // qBittorrent / Plex HTTP APIs
 const COOLING_INTERVAL = 1000;   // fan RPM moves slowly; no need to walk hwmon at 10Hz
+const GPU_INTERVAL = 1000;
 // Some sensors are read by sending the device a command (nvme, iwlwifi,
 // drivetemp on SATA disks); once a second is plenty and spares the hardware.
 const TEMP_INTERVAL = 1000;
@@ -128,6 +130,8 @@ let dockerAt = 0;
 let dockerBusy = false;
 let cooling = null;
 let coolingAt = 0;
+let gpu = null;
+let gpuAt = 0;
 let temperature = null;
 let temperatureAt = 0;
 let lastSample = null;
@@ -212,6 +216,10 @@ function sample(full) {
       cooling = safe(getCooling, cooling);
       coolingAt = now;
     }
+    if (now - gpuAt >= GPU_INTERVAL) {
+      gpu = safe(getGpu, gpu);
+      gpuAt = now;
+    }
   }
 
   const cpu = safe(getCpuUsage, []);
@@ -238,6 +246,7 @@ function sample(full) {
     cooling,
     processes,
     docker,
+    gpu,
     qbittorrent: qbit.value,
     plex: plex.value,
   };

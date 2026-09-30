@@ -95,6 +95,7 @@ test('temperature: duplicates dropped, coretemp package is the cpu temp', () => 
     'drivetemp/drivetemp',
   ]);
   assert.strictEqual(t.cpu, 60);
+  assert.strictEqual(t.cpuLabel, 'coretemp/Package id 0');
 });
 
 test('cooling: sorted by chip then channel, pwm mode decoded', () => {

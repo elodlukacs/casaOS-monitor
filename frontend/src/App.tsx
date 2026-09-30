@@ -6,6 +6,7 @@ import NetworkPanel from './components/NetworkPanel';
 import type { NetSeries } from './components/NetworkPanel';
 import TempPanel from './components/TempPanel';
 import DockerPanel from './components/DockerPanel';
+import GpuPanel from './components/GpuPanel';
 import TorrentPanel from './components/TorrentPanel';
 import PlexPanel from './components/PlexPanel';
 import ProcessList from './components/ProcessList';
@@ -277,8 +278,8 @@ export default function App() {
   }
 
   const alertColor = levelColor(worst(alerts.map(a => a.level)));
-  // Plex / qBittorrent column; dropped (two-column grid) when neither is configured.
-  const hasApps = !!(metrics.plex || metrics.qbittorrent);
+  // Plex / GPU / qBittorrent column; dropped (two-column grid) when none has data.
+  const hasApps = !!(metrics.plex || metrics.gpu || metrics.qbittorrent);
   // The picked interface while it exists, else the server's main one (listed first).
   const shownIface = metrics.network.find(n => n.iface === netIface) ?? metrics.network[0];
   const pickIface = (iface: string) => {
@@ -361,6 +362,7 @@ export default function App() {
         {hasApps && (
           <div className="left-col">
             {metrics.plex && <PlexPanel plex={metrics.plex} />}
+            {metrics.gpu && <GpuPanel gpu={metrics.gpu} />}
             {metrics.qbittorrent && <TorrentPanel qbit={metrics.qbittorrent} />}
           </div>
         )}

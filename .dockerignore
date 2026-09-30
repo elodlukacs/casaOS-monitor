@@ -6,3 +6,4 @@ mobile
 .github
 .claude
 *.md
+.env

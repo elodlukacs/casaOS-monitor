@@ -78,12 +78,12 @@ function getTemperatures() {
   // pick best CPU temp by keyword priority
   for (const kw of CPU_KEYWORDS) {
     const match = all.find(t => t.label.toLowerCase().includes(kw));
-    if (match) return { cpu: match.celsius, all };
+    if (match) return { cpu: match.celsius, cpuLabel: match.label, all };
   }
 
   // fallback: highest reading
   const hottest = all.reduce((a, b) => a.celsius > b.celsius ? a : b);
-  return { cpu: hottest.celsius, all };
+  return { cpu: hottest.celsius, cpuLabel: hottest.label, all };
 }
 
 module.exports = { getTemperatures };

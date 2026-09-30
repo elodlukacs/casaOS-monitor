@@ -13,7 +13,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── page layout: header / cpu / (plex+torrents | mem+net+temp | docker+proc), fills the viewport ── */
+/* ── page layout: header / cpu / (plex+gpu+torrents | mem+net+temp | docker+proc), fills the viewport ── */
 .app {
   height: 100%;
   display: flex;
@@ -64,12 +64,14 @@ body {
 
 .main-grid.no-apps { grid-template-columns: minmax(300px, 30%) minmax(0, 1fr); }
 
-/* left column: plex at natural height (capped), torrents fill the rest;
-   either fills the column alone when the other isn't configured */
+/* left column: plex (capped) and gpu at natural height, torrents fill the
+   rest; without torrents the last panel fills it */
 .left-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .left-col .panel-plex { flex: 0 1 auto; min-height: 90px; max-height: 55%; }
+.left-col .panel-gpu { flex: 0 0 auto; }
 .left-col .panel-torrent { flex: 1 1 0; min-height: 140px; }
-.left-col > .panel:only-child { flex: 1 1 auto; max-height: none; }
+.left-col > .panel:only-child,
+.left-col > .panel:last-child:not(.panel-torrent) { flex: 1 1 auto; max-height: none; }
 .panel-plex .panel-body, .panel-torrent .panel-body { overflow: auto; }
 
 /* middle column: mem and net at natural height, temp fills the rest. No
