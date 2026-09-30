@@ -152,7 +152,7 @@ function appPoller(name, enabled, load, empty) {
   return p;
 }
 
-const qbit = appPoller('qbittorrent', qbitConfigured(), getTorrents, { dlSpeed: 0, upSpeed: 0, torrents: [] });
+const qbit = appPoller('qbittorrent', qbitConfigured(), getTorrents, { dlSpeed: 0, upSpeed: 0, dlTotal: 0, upTotal: 0, torrents: [] });
 const plex = appPoller('plex', plexConfigured(), getSessions, { sessions: [], libraries: [] });
 
 function sample(full) {
