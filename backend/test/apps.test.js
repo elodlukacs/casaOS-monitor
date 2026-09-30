@@ -32,7 +32,7 @@ before(async () => {
 });
 after(() => server.close());
 
-test('qbittorrent: only torrents with traffic, and global rates', async () => {
+test('qbittorrent: only torrents with traffic, global rates and session totals', async () => {
   routes['/api/v2/transfer/info'] = () => [200, { dl_info_speed: 5000, up_info_speed: 300, dl_info_data: 1e9, up_info_data: 2e8 }];
   routes['/api/v2/torrents/info'] = () => [200, [
     { hash: 'a', name: 'slow', state: 'downloading', progress: 0.5, size: 100, dlspeed: 10, upspeed: 0, eta: 60, num_seeds: 1, num_leechs: 2, ratio: 0 },
@@ -41,7 +41,7 @@ test('qbittorrent: only torrents with traffic, and global rates', async () => {
   ]];
   assert.ok(qbit.qbitConfigured());
   const q = await qbit.getTorrents();
-  assert.deepStrictEqual([q.dlSpeed, q.upSpeed], [5000, 300]);
+  assert.deepStrictEqual([q.dlSpeed, q.upSpeed, q.dlTotal, q.upTotal], [5000, 300, 1e9, 2e8]);
   assert.deepStrictEqual(q.torrents.map(t => t.name), ['fast', 'slow'], 'sorted by total speed, idle one left out');
   assert.strictEqual(q.torrents[0].eta, null, "qBittorrent's 8640000 means unknown");
   assert.ok(seen.includes('/api/v2/torrents/info?filter=active'), 'trailing slash in QBIT_URL handled');
