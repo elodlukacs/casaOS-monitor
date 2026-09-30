@@ -11,6 +11,7 @@ interface UsageBarProps {
   display?: string;     // text shown after the bar; defaults to the percentage
   valueWidth?: number;
   valueColor?: string;  // e.g. a threshold colour; defaults to the normal text colour
+  totalWidth?: number;  // min width of the `total` text; equal across rows keeps bars aligned
 }
 
 // btop-style meter: a track with a fill whose colour follows the level.
@@ -25,6 +26,7 @@ export default function UsageBar({
   display,
   valueWidth = 34,
   valueColor,
+  totalWidth = 54,
 }: UsageBarProps) {
   const pct = Math.min(100, Math.max(0, value));
   const fill = color ?? (gradient ? gradAt(gradient, pct / 100) : theme.fg);
@@ -79,7 +81,7 @@ export default function UsageBar({
         {display ?? `${pct.toFixed(0)}%`}
       </span>
       {total && (
-        <span style={{ color: valueColor ?? theme.hi_fg, minWidth: 54, flexShrink: 0, textAlign: 'right' }}>
+        <span style={{ color: valueColor ?? theme.hi_fg, minWidth: totalWidth, flexShrink: 0, textAlign: 'right' }}>
           {total}
         </span>
       )}

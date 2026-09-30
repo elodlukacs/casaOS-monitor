@@ -38,6 +38,8 @@ const USED: [string, string, string] = [theme.used_start, theme.used_mid, theme.
 const CACHED: [string, string, string] = [theme.cached_start, theme.cached_mid, theme.cached_end];
 
 const MIN_MOUNT_SIZE = 1024 * 1024 * 1024;
+// fits "123.4G/123.4G", so In use, Cache and Swap bars end at the same place
+const TOTAL_W = 96;
 
 // Widest fmtSpeed output plus the arrow is 9 characters ("↓123.4M/s").
 const ioField: React.CSSProperties = { display: 'inline-block', minWidth: '9ch', textAlign: 'right' };
@@ -78,13 +80,24 @@ export default function MemoryPanel({ memory, disk, storage }: Props) {
         </>
       }
     >
-      <UsageBar label="In use" value={memory.usedPercent} total={fmtBytes(memory.used)} gradient={USED}   labelWidth={72} valueColor={usedColor} />
-      <UsageBar label="Cache"  value={pct(cache)}         total={fmtBytes(cache)}       gradient={CACHED} labelWidth={72} />
-      <div style={{ fontSize: 10, lineHeight: '14px', color: theme.graph_text, margin: '0 0 4px 78px' }}>
-        freed automatically when needed · {fmtBytes(memory.free)} unused
+      {/* "used/total" like the disks: a bare "4.0G" next to "In use" read as the RAM size */}
+      <UsageBar label="In use" value={memory.usedPercent} total={`${fmtBytes(memory.used)}/${fmtBytes(memory.total)}`} gradient={USED} labelWidth={72} totalWidth={TOTAL_W} valueColor={usedColor} />
+      <UsageBar label="Cache"  value={pct(cache)}         total={fmtBytes(cache)}       gradient={CACHED} labelWidth={72} totalWidth={TOTAL_W} />
+      <div
+        style={{
+          fontSize: 10,
+          lineHeight: '14px',
+          color: theme.graph_text,
+          margin: '0 0 4px 78px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
+        cache is freed when needed · {fmtBytes(memory.free)} unused
       </div>
       {memory.swap.total > 0 && (
-        <UsageBar label="Swap" value={memory.swap.usedPercent} total={fmtBytes(memory.swap.used)} gradient={USED} labelWidth={72} valueColor={swapColor} />
+        <UsageBar label="Swap" value={memory.swap.usedPercent} total={fmtBytes(memory.swap.used)} gradient={USED} labelWidth={72} totalWidth={TOTAL_W} valueColor={swapColor} />
       )}
 
       {drives.length > 0 && (
