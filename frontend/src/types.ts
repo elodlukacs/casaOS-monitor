@@ -1,6 +1,7 @@
 export interface CpuCore {
   name: string;
   usage: number;
+  iowait?: number; // % of time idle with disk I/O outstanding
 }
 
 export interface MemoryInfo {
@@ -44,6 +45,7 @@ export interface StorageInfo {
 
 export interface TemperatureInfo {
   cpu: number;
+  cpuLabel?: string; // which entry of `all` the cpu value comes from
   all: { label: string; celsius: number }[];
 }
 
@@ -162,7 +164,8 @@ export interface Metrics {
   temperature: TemperatureInfo | null;
   cooling?: Cooling | null;
   processes: Process[];
-  docker?: DockerContainer[] | null; // null: docker socket not mounted
+  docker?: DockerContainer[] | null; // null: Docker API not configured or not reachable
+  gpu?: GpuInfo | null;              // null: no readable GPU
   qbittorrent?: QbitInfo | null;     // null: QBIT_URL not set
   plex?: PlexInfo | null;            // null: PLEX_URL not set
 }
@@ -178,6 +181,7 @@ export interface HistoryPoint {
 export interface HistoryMessage {
   type: 'history';
   stepMs: number;
+  iface?: string | null; // interface the rx/tx points belong to
   points: HistoryPoint[];
 }
 
@@ -187,4 +191,18 @@ export type ServerMessage = Metrics | HistoryMessage;
 export interface Point {
   t: number;
   v: number;
+}
+
+export interface GpuInfo {
+  card: string;
+  driver: string;
+  freqMhz: number | null;      // actual GT clock; 0 while asleep
+  maxMhz: number | null;
+  minMhz: number | null;
+  busyPercent: number | null;  // amdgpu
+  awakePercent: number | null; // i915: share of time out of RC6 sleep
+  engines: Record<string, number> | null; // % busy per engine class, transcoders only
+  transcoders: number;
+  transcodersOnGpu: number;
+  engineStats: boolean;        // kernel reports per-client engine time
 }

@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -15,7 +13,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── page layout: header / cpu / (plex+torrents | mem+net+temp | docker+proc), fills the viewport ── */
+/* ── page layout: header / cpu / (plex+gpu+torrents | mem+net+temp | docker+proc), fills the viewport ── */
 .app {
   height: 100%;
   display: flex;
@@ -66,12 +64,14 @@ body {
 
 .main-grid.no-apps { grid-template-columns: minmax(300px, 30%) minmax(0, 1fr); }
 
-/* left column: plex at natural height (capped), torrents fill the rest;
-   either fills the column alone when the other isn't configured */
+/* left column: plex (capped) and gpu at natural height, torrents fill the
+   rest; without torrents the last panel fills it */
 .left-col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
 .left-col .panel-plex { flex: 0 1 auto; min-height: 90px; max-height: 55%; }
+.left-col .panel-gpu { flex: 0 0 auto; }
 .left-col .panel-torrent { flex: 1 1 0; min-height: 140px; }
-.left-col > .panel:only-child { flex: 1 1 auto; max-height: none; }
+.left-col > .panel:only-child,
+.left-col > .panel:last-child:not(.panel-torrent) { flex: 1 1 auto; max-height: none; }
 .panel-plex .panel-body, .panel-torrent .panel-body { overflow: auto; }
 
 /* middle column: mem and net at natural height, temp fills the rest. No
@@ -135,3 +135,20 @@ body {
 ::-webkit-scrollbar-track { background: #1a1a1a; }
 ::-webkit-scrollbar-thumb { background: #3f3f3f; border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* ── net: other interfaces, click to graph ── */
+.net-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.net-row:hover { background: #252525; }

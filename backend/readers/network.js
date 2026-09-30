@@ -19,6 +19,39 @@ function readNetStats() {
   return stats;
 }
 
+// Interfaces carrying a default route in the main table, lowest metric first.
+// /proc/net/route columns: Iface Destination Gateway Flags RefCnt Use Metric Mask ...
+function defaultRouteIfaces() {
+  try {
+    return fs
+      .readFileSync(`${PROC_PATH}/net/route`, 'utf8')
+      .trim()
+      .split('\n')
+      .slice(1)
+      .map(l => l.trim().split(/\s+/))
+      .filter(p => p[1] === '00000000' && p[7] === '00000000' && (parseInt(p[3], 16) & 1)) // RTF_UP
+      .sort((a, b) => Number(a[6]) - Number(b[6]))
+      .map(p => p[0]);
+  } catch {
+    return [];
+  }
+}
+
+// The main interface goes first; clients graph network[0]. /proc/net/dev
+// lists interfaces in kernel order, which puts Wi-Fi or a VPN first on some
+// boxes. Without a default route, fall back to the busiest since boot.
+function primaryOrder(current) {
+  const routed = defaultRouteIfaces();
+  const rank = iface => {
+    const i = routed.indexOf(iface);
+    return i === -1 ? routed.length : i;
+  };
+  const traffic = iface => current[iface].rxBytes + current[iface].txBytes;
+  return Object.keys(current)
+    .filter(isPhysical)
+    .sort((a, b) => rank(a) - rank(b) || (routed.length ? 0 : traffic(b) - traffic(a)));
+}
+
 function isPhysical(iface) {
   if (iface === 'lo') return false;
   if (iface.startsWith('veth')) return false;
@@ -34,14 +67,13 @@ function getNetworkInfo() {
   if (!prevNetStats || !prevTime) {
     prevNetStats = current;
     prevTime = now;
-    return Object.keys(current).filter(isPhysical).map(iface => ({
+    return primaryOrder(current).map(iface => ({
       iface, rxBytesPerSec: 0, txBytesPerSec: 0,
     }));
   }
 
   const elapsed = (now - prevTime) / 1000;
-  const result = Object.keys(current)
-    .filter(isPhysical)
+  const result = primaryOrder(current)
     .map(iface => {
       const prev = prevNetStats[iface];
       if (!prev) return { iface, rxBytesPerSec: 0, txBytesPerSec: 0 };

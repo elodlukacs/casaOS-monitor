@@ -18,6 +18,7 @@ export const theme = {
   proc_box: '#923535',
   temp_box: '#3a5f8f',
   docker_box: '#2f6f8f',
+  gpu_box: '#2a8a80',
   torrent_box: '#6a4a8f',
   plex_box: '#8f6a2a',
   plex: '#e5a00d',
