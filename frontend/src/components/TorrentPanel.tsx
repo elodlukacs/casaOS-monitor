@@ -47,9 +47,11 @@ export default function TorrentPanel({ qbit }: Props) {
       borderColor={theme.torrent_box}
       bottomRight={
         <>
-          <span style={{ color: theme.download_end }}>▼{fmtRate(qbit.dlSpeed)}</span>
-          <span style={{ color: theme.graph_text }}> · </span>
-          <span style={{ color: theme.upload_end }}>▲{fmtRate(qbit.upSpeed)}</span>
+          <span style={{ color: theme.download_end }}>▼{fmtRate(qbit.dlSpeed)}/s</span>{' '}
+          <span style={{ color: theme.upload_end }}>▲{fmtRate(qbit.upSpeed)}/s</span>
+          <span style={{ color: theme.graph_text }} title="transferred since qBittorrent started"> · total </span>
+          <span style={{ color: theme.download_end }}>▼{fmtSize(qbit.dlTotal)}</span>{' '}
+          <span style={{ color: theme.upload_end }}>▲{fmtSize(qbit.upTotal)}</span>
         </>
       }
     >

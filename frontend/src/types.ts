@@ -90,6 +90,8 @@ export interface Torrent {
 export interface QbitInfo {
   dlSpeed: number;       // global transfer rates, bytes/s
   upSpeed: number;
+  dlTotal: number;       // bytes since qBittorrent started
+  upTotal: number;
   torrents: Torrent[];   // only those with traffic (kept ~10s after it stops)
   error: string | null;  // WebUI unreachable / not authorised
 }

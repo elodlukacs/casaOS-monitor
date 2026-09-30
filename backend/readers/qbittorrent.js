@@ -63,6 +63,9 @@ async function getTorrents() {
   return {
     dlSpeed: transfer.dl_info_speed || 0,
     upSpeed: transfer.up_info_speed || 0,
+    // bytes transferred since qBittorrent started
+    dlTotal: transfer.dl_info_data || 0,
+    upTotal: transfer.up_info_data || 0,
     torrents,
     error: null,
   };
